@@ -1,5 +1,7 @@
 # Nota
 
+![Nota: Kendi müzik arşivin, cebinde.](docs/kapak.png)
+
 **Kendi müzik arşivini cebine taşıyan Android müzik uygulaması.**
 
 Nota, evdeki sunucunda duran müzik arşivini ([Navidrome](https://www.navidrome.org/)) telefonundan
