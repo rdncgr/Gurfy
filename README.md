@@ -9,6 +9,21 @@ dinlemeni sağlar. Spotify ya da YouTube Music gibi aylık abonelik ödemezsin; 
 diskinde durur. Nota bunun üstüne de keşfi kolaylaştırır: sevdiğin şarkılara benzerlerini bulur,
 radyoda duyduğun şarkıyı tanır ve tek dokunuşla arşivine ekler.
 
+## Ekran görüntüleri
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/ekran/1-ana-sayfa.jpg" width="240" alt="Ana sayfa"><br><sub>Ana sayfa</sub></td>
+    <td align="center"><img src="docs/ekran/2-simdi-caliyor.jpg" width="240" alt="Şimdi çalıyor"><br><sub>Şimdi çalıyor</sub></td>
+    <td align="center"><img src="docs/ekran/3-kesfet.webp" width="240" alt="Keşfet: sana özel öneriler"><br><sub>Keşfet: sana özel öneriler</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/ekran/4-radyolar.webp" width="240" alt="Radyolar"><br><sub>Radyolar</sub></td>
+    <td align="center"><img src="docs/ekran/5-radyo-sarki-tanima.webp" width="240" alt="Radyoda şarkı tanıma"><br><sub>Radyoda şarkı tanıma</sub></td>
+    <td align="center"><img src="docs/ekran/6-ayarlar.webp" width="240" alt="Ayarlar"><br><sub>Ayarlar</sub></td>
+  </tr>
+</table>
+
 ## Neler yapabilirsin?
 
 ### 🎵 Dinle
