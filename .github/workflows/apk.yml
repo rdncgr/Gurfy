@@ -31,7 +31,14 @@ jobs:
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then echo "::error::KEYSTORE_BASE64 secret tanımlı değil"; exit 1; fi
           mkdir -p keystore
-          echo "$KEYSTORE_BASE64" | base64 -d > keystore/debug.keystore
+          # Boşluk, satır sonu ve certutil'in BEGIN/END satırları temizlenir
+          printf '%s' "$KEYSTORE_BASE64" | sed 's/-----[A-Z ]*-----//g' | tr -d '[:space:]' > keystore.b64
+          if ! base64 -d keystore.b64 > keystore/debug.keystore; then
+            echo "::error::KEYSTORE_BASE64 çözülemedi: değer base64 değil, yanlış yapıştırılmış olabilir"; exit 1
+          fi
+          if ! keytool -list -keystore keystore/debug.keystore -storepass android >/dev/null; then
+            echo "::error::KEYSTORE_BASE64 geçerli bir imza anahtarı değil"; exit 1
+          fi
 
       - name: APK derle
         run: gradle :app:assembleDebug --no-daemon --stacktrace
