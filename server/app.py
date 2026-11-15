@@ -153,7 +153,7 @@ app = FastAPI(title="Nota müzik servisi")
 
 def auth(x_api_key: str = Header(default="")):
     if API_KEY and not secrets.compare_digest(x_api_key, API_KEY):
-        raise HTTPException(401, "API anahtarı hatalı")
+        raise HTTPException(401, "Servis parolası hatalı")
 
 
 # ---------------------------------------------------------------- yardımcılar

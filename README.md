@@ -68,7 +68,7 @@ ayarların ve indirdiklerin silinmez.
 ### 2. Nota servisini kur (isteğe bağlı ama önerilir)
 1. Sunucuda `nota-servis` adında bir klasör aç ve [`server/app.py`](server/app.py) dosyasını içine koy.
 2. [`server/zimaos-app.yaml`](server/zimaos-app.yaml) dosyasındaki **DEĞİŞTİR** yazan satırları doldur:
-   servis parolası, Last.fm anahtarı, Navidrome kullanıcı adı ve parolası, müzik klasörü.
+   servis parolası (`API_KEY`, kendin belirlersin), Last.fm anahtarı, Navidrome kullanıcı adı ve parolası, müzik klasörü.
    Müzik klasörü Navidrome'unkiyle **aynı** olmalı.
 3. ZimaOS'ta **Özelleştirilmiş Uygulama Yükle > İçe aktar** ile YAML'ı yapıştır.
    Başka bir sistemde `docker compose up -d` yeterli.
@@ -80,7 +80,7 @@ Uygulamada **Ayarlar > Bağlantılar**:
 - **Navidrome adresi:** `http://SUNUCU-ADRESİ:4533`. Ev dışından erişmek için Tailscale gibi bir VPN önerilir.
 - **Kullanıcı adı / parola:** Navidrome hesabın
 - **Nota servis adresi:** `http://SUNUCU-ADRESİ:8099`
-- **API anahtarı:** YAML'da `API_KEY` olarak yazdığın parola
+- **Servis parolası:** YAML'da `API_KEY` olarak belirlediğin parola
 - **Last.fm kullanıcı adı:** isteğe bağlı, öneriler ve istatistikler için
 
 Bağlantıların durumu aynı ekranda yeşil / kırmızı olarak görünür.

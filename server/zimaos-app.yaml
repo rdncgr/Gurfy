@@ -20,7 +20,7 @@ services:
     # adresini sık sık "bot" diye engelliyor, IPv6'yı engellemiyor). Servis yine 8099 portundan açılır.
     network_mode: host
     environment:
-      API_KEY: "DEĞİŞTİR-uzun-bir-parola"            # telefondaki uygulamaya da aynısı yazılacak
+      API_KEY: "DEĞİŞTİR-uzun-bir-parola"            # servis parolası: kendin belirle, uygulamada "Servis parolası" alanına da aynısını yaz
       LASTFM_API_KEY: "DEĞİŞTİR-lastfm-anahtarı"     # https://www.last.fm/api/account/create
       NAVIDROME_URL: "http://192.168.1.101:4533"      # Navidrome adresi (port farklıysa düzeltin)
       NAVIDROME_USER: "DEĞİŞTİR-navidrome-kullanıcı"

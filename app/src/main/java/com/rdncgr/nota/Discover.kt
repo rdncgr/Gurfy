@@ -1021,7 +1021,7 @@ private fun checkAll(): List<Status> {
         return out
     }
     try {
-        Graph.service.jobs() // API anahtarını da doğrular
+        Graph.service.jobs() // servis parolasını da doğrular
         val h = Graph.service.health()
         out += Status("Nota servisi", true, "yt-dlp " + h.optString("yt_dlp", "?"))
         if (h.has("po_token")) {
@@ -1126,11 +1126,11 @@ private fun ConnectionSettings() {
             label = { Text("Adres") }, placeholder = { Text("http://192.168.1.101:8099") },
         )
         OutlinedTextField(
-            serviceKey, { serviceKey = it }, singleLine = true, modifier = field, label = { Text("API anahtarı") },
+            serviceKey, { serviceKey = it }, singleLine = true, modifier = field, label = { Text("Servis parolası") },
             visualTransformation = PasswordVisualTransformation(),
         )
         Text(
-            "Last.fm anahtarı sunucuda (Nota servisinin YAML dosyasında) tutulur; durumu aşağıda görünür.",
+            "Servis parolası: sunucuyu kurarken YAML'da API_KEY olarak belirlediğin parola. Başkalarının sunucuna şarkı indirmesini ya da silmesini engeller. Last.fm anahtarı da sunucuda tutulur; durumu aşağıda görünür.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
