@@ -1,77 +1,119 @@
 # Nota
 
-Ev sunucusundaki Navidrome'dan müzik çalan, benzer şarkıları bulup tek dokunuşla
-sunucuya indirten Android uygulaması.
+**Kendi müzik arşivini cebine taşıyan Android müzik uygulaması.**
 
-İki parçadan oluşur:
+Nota, evdeki sunucunda duran müzik arşivini ([Navidrome](https://www.navidrome.org/)) telefonundan
+dinlemeni sağlar. Spotify ya da YouTube Music gibi aylık abonelik ödemezsin; müzik senin
+diskinde durur. Nota bunun üstüne de keşfi kolaylaştırır: sevdiğin şarkılara benzerlerini bulur,
+radyoda duyduğun şarkıyı tanır ve tek dokunuşla arşivine ekler.
+
+## Neler yapabilirsin?
+
+### 🎵 Dinle
+- Albüm, sanatçı, tür ve çalma listelerine göre düzenlenmiş kütüphane
+- Ekran kapalıyken ve başka uygulamadayken kesintisiz çalma
+- Telefona indirip internetsiz dinleme; en çok dinlediklerin kendiliğinden telefona iner
+- Tekrar (kapalı / liste / tek şarkı) ve karışık çalma
+- **Sana özel karışık:** favorilerin, sık dinlediklerin, sevdiğin türler ve uzun süredir
+  açmadıkların karışık bir listede. Sürekli geçtiğin şarkılar listeye bir daha girmez.
+
+### 📻 Radyo
+- Türkiye'nin radyoları ve dünyanın en çok dinlenen 50 radyosu, tek listede ve aranabilir
+- Favori radyolar, istasyonlar arasında ileri/geri geçiş, rastgele radyo
+- Yayında çalan şarkının adı ekranda
+- **Bu şarkı ne?** Radyoda çalan şarkıyı tanır, tek dokunuşla arşivine indirir.
+  Tanınan şarkılar "Radyoda duyduklarım" listesinde birikir.
+
+### 🔍 Keşfet
+- Kütüphanede, radyolarda ve internette aynı anda arama; arşivinde olmayanları önce dinleyip sonra indirme
+- Çalan şarkıya benzerler ve popüler listeler
+- Spotify ve YouTube listelerini bağlantısıyla içeri aktarma; eksik şarkılar arşive iner
+- İndirmelerin durumunu takip etme, hatalıları tekrar deneme
+
+### 📊 Last.fm
+- Dinlediğin şarkılar Last.fm hesabına işlenir (internet yokken de kaydedilir, sonra gönderilir)
+- Dinleme geçmişine göre öneriler, "Unuttukların" listesi ve dinleme istatistiklerin
+
+### 🦻 İşitme cihazı uyumluluk modu
+Bluetooth işitme cihazlarında (ASHA / LE Audio) kesilmeleri azaltmak için ses ayarları.
+Ayarlar > Çalma bölümünde bulunur.
+
+## Nasıl çalışır?
+
+Nota iki parçadan oluşur:
 
 | Parça | Nerede çalışır | Ne yapar |
 |---|---|---|
-| **Uygulama** (`app/`) | Android telefon | Kütüphane, arama, çalma listeleri, arka planda çalma, telefona indirip çevrimdışı dinleme, benzer şarkılar, Spotify listesi aktarma |
-| **Nota servisi** (`server/`) | ZimaOS sunucu | Last.fm'den benzer şarkı bulur, yt-dlp ile indirir, etiketler, Navidrome klasörüne koyar ve taramayı başlatır |
+| **Uygulama** | Android telefon | Dinleme, radyo, arama, keşif, indirme takibi |
+| **Nota servisi** | Ev sunucun (Navidrome'un yanında) | Şarkı bulur ve indirir, etiketler, türünü yazar, radyodaki şarkıyı tanır |
 
-## 1. Sunucuya Nota servisini kurma (ZimaOS)
+Yalnızca dinlemek için Navidrome yeterli. İndirme, benzer şarkılar, radyoda şarkı tanıma ve
+Last.fm önerileri için Nota servisi gerekir.
 
-1. **Last.fm anahtarı alın:** https://www.last.fm/api/account/create — yalnızca "Application name"
-   doldurmak yeterli. Çıkan **API key** değerini kopyalayın.
-2. ZimaOS **Dosyalar** uygulamasında `AppData` içinde `nota-servis` klasörü oluşturun ve
-   `server/app.py` dosyasını içine yükleyin.
-3. Navidrome uygulamasının ayarlarını açıp `/music` karşısında yazan klasör yolunu not edin.
-4. `server/zimaos-app.yaml` dosyasını açın, **DEĞİŞTİR** yazan satırları doldurun
-   (parola, Last.fm anahtarı, Navidrome kullanıcı/parola, müzik klasörü).
-5. ZimaOS'ta **Özelleştirilmiş Uygulama Yükle → İçe aktar** deyip YAML'ı yapıştırın ve kurun.
-6. İlk açılış 1-2 dakika sürer. Tarayıcıda `http://192.168.1.101:8099/health` açıldığında
-   `"ok": true` görüyorsanız servis hazırdır.
+## Gerekenler
 
-Servis yalnızca müzik klasörüne yazar; fotoğraf diskine dokunmaz.
+- Android 8.0 veya üstü bir telefon
+- Kurulu ve çalışan bir [Navidrome](https://www.navidrome.org/) sunucusu
+- Nota servisi için Docker çalıştırabilen bir sunucu (ZimaOS, CasaOS, Unraid, düz Docker…)
+- Ücretsiz bir [Last.fm API anahtarı](https://www.last.fm/api/account/create)
+  (benzer şarkılar ve türler için)
 
-## 2. APK'yı alma
+## Kurulum
 
-Kod GitHub'a gönderildiğinde **Actions** otomatik derler. Deponun **Releases** bölümündeki
-en üstteki `nota-N.apk` dosyasını telefona indirip kurun. Yeni sürümler eskisinin üzerine kurulur.
+### 1. Uygulamayı yükle
+[Releases](../../releases) bölümündeki en yeni `nota-N.apk` dosyasını telefonuna indirip aç.
+Telefon "bilinmeyen kaynak" izni isterse ver. Yeni sürümler eskisinin üzerine kurulur;
+ayarların ve indirdiklerin silinmez.
 
-## 3. Uygulama ayarları
+### 2. Nota servisini kur (isteğe bağlı ama önerilir)
+1. Sunucuda `nota-servis` adında bir klasör aç ve [`server/app.py`](server/app.py) dosyasını içine koy.
+2. [`server/zimaos-app.yaml`](server/zimaos-app.yaml) dosyasındaki **DEĞİŞTİR** yazan satırları doldur:
+   servis parolası, Last.fm anahtarı, Navidrome kullanıcı adı ve parolası, müzik klasörü.
+   Müzik klasörü Navidrome'unkiyle **aynı** olmalı.
+3. ZimaOS'ta **Özelleştirilmiş Uygulama Yükle > İçe aktar** ile YAML'ı yapıştır.
+   Başka bir sistemde `docker compose up -d` yeterli.
+4. İlk açılış 1-2 dakika sürer. Tarayıcıda `http://SUNUCU-ADRESİ:8099/health` adresinde
+   `"ok": true` görüyorsan servis hazırdır.
 
-- **Navidrome adresi:** `http://192.168.1.101:4533` (ev dışında Tailscale adresi)
-- **Kullanıcı adı / parola:** Navidrome hesabınız
-- **Nota servis adresi:** `http://192.168.1.101:8099`
-- **API anahtarı:** YAML'daki `API_KEY` ile aynı
+### 3. Uygulamayı bağla
+Uygulamada **Ayarlar > Bağlantılar**:
+- **Navidrome adresi:** `http://SUNUCU-ADRESİ:4533`. Ev dışından erişmek için Tailscale gibi bir VPN önerilir.
+- **Kullanıcı adı / parola:** Navidrome hesabın
+- **Nota servis adresi:** `http://SUNUCU-ADRESİ:8099`
+- **API anahtarı:** YAML'da `API_KEY` olarak yazdığın parola
+- **Last.fm kullanıcı adı:** isteğe bağlı, öneriler ve istatistikler için
 
-## Notlar
+Bağlantıların durumu aynı ekranda yeşil / kırmızı olarak görünür.
 
-- **Radyolar:** Türkiye radyoları radio-browser.info'dan güncel adresleriyle çekilir ve
-  `/DATA/AppData/nota-servis/radyolar.json` dosyasında saklanır (günde bir yenilenir). Bir adres
-  bozuksa ya da listede olmayan bir radyo eklemek istersen aynı klasöre `radyolar-ozel.json` yaz:
-  `[{"name": "Radyo Adı", "url": "https://akış-adresi"}, {"name": "İstemediğim Radyo", "hidden": true}]`.
-  Aynı isimli kayıt otomatik listedekinin yerine geçer; Navidrome'daki aynı isimli radyonun adresi
-  de kendiliğinden güncellenir (servisin Navidrome kullanıcısı yönetici olmalı).
-- **Dünya radyoları:** radio-browser.info'da en çok dinlenen 50 radyo `radyolar-dunya.json` dosyasında
-  saklanır, günde bir yenilenir.
-- **İndirme geçmişi** `indirmeler.json` dosyasında tutulur; servis yeniden başlasa da kaybolmaz,
-  yarım kalan indirmeler tekrar sıraya girer.
-- **Sunucudan silme:** Uygulamadan "Sunucudan sil" denince servis dosyanın yerini Navidrome'dan sorar,
-  müzik klasöründen siler ve taramayı başlatır. Servisin müzik klasörü Navidrome'unkiyle aynı klasör
-  olmalı (varsayılan YAML'da ikisi de `/DATA/Media/Music`).
-- **Türler:** Servis indirdiği şarkıya Last.fm etiketlerinden tür yazar (Türkçe Pop, Arabesk, Anadolu Rock…).
-  Eski şarkılar için uygulamada Kütüphane > Türler > "Otomatik tür ekle" düğmesi var; yalnızca türü boş
-  olan dosyalara yazar, türü olanlara dokunmaz, bitince Navidrome'u taratır.
-- **Last.fm geçmişi:** Uygulamada Ayarlar > Bağlantılar'a Last.fm kullanıcı adı yazılınca servis
-  dinleme geçmişini okur (yetki gerekmez): Keşfet > Sana özel öneriler, ana sayfada "Unuttukların",
-  Kütüphane'deki istatistik ekranı. Sonuçlar serviste birkaç saat önbellekte tutulur.
-- **YouTube engelleri:** İndirmeler sırayla yapılır ve iki YouTube erişimi arasında 20–30 sn beklenir
-  (`DOWNLOAD_DELAY_MIN` / `DOWNLOAD_DELAY_MAX` ile değiştirilebilir). Bot engeline takılan şarkı 10 dk
-  sonra bir kez daha denenir. YAML'daki `bgutil-provider` konteyneri YouTube'un istediği PO token'ı
-  üretir (hesap gerekmez); `deno` paketi yt-dlp'nin YouTube'daki JS doğrulamasını çözer. İkisinin
-  durumu uygulamada Ayarlar > Bağlantılar'da görünür.
-- **Bu şarkı ne?** Radyo çalarken servis önce yayının kendi başlık bilgisine (ICY) bakar; orada
-  "Sanatçı - Şarkı" yoksa ffmpeg ile 10 saniye kaydedip `shazamio` ile tanır. Bunun için YAML'daki
-  `pip install` satırında `shazamio` olmalı (sunucu `/health` cevabında `"shazam": true` görünür).
-- YouTube / YouTube Music listeleri (bağlantıda `list=` olmalı) yt-dlp ile okunur; her şarkı
-  kendi video adresinden indirilir. Gizli listeler okunamaz.
-- Spotify aktarma, herkese açık listelerde anahtarsız çalışır (ilk ~100 şarkı). Daha uzun
-  listeler için YAML'a `SPOTIFY_CLIENT_ID` ve `SPOTIFY_CLIENT_SECRET` ekleyin.
-- İndirilen şarkılar `Sanatçı/Albüm/Şarkı.m4a` düzeninde kaydedilir; albümü bulunamayanlar
-  `Tekliler` klasörüne gider.
-- **İmza anahtarı** (`keystore/debug.keystore`) depoya konmaz. GitHub'da Settings > Secrets and variables >
-  Actions altına `KEYSTORE_BASE64` adıyla dosyanın base64 halini ekleyin
-  (`base64 -w0 keystore/debug.keystore`). Aynı anahtarla imzalanmayan APK eskisinin üzerine kurulmaz.
+## Sık sorulanlar
+
+**Radyolar nereden geliyor?**
+[radio-browser.info](https://www.radio-browser.info/) üzerinden, güncel yayın adresleriyle. Liste günde bir yenilenir.
+Bozuk bir adresi düzeltmek ya da listede olmayan bir radyo eklemek için servis klasörüne
+`radyolar-ozel.json` yaz:
+`[{"name": "Radyo Adı", "url": "https://yayın-adresi"}, {"name": "İstemediğim Radyo", "hidden": true}]`
+
+**Şarkılar arşive nasıl iniyor?**
+Servis şarkıyı YouTube'dan en iyi kalitede indirir; kapak, albüm ve tür bilgisini yazıp
+`Sanatçı/Albüm/Şarkı.m4a` düzeninde müzik klasörüne koyar, ardından Navidrome'u taratır.
+YouTube'un engeline takılmamak için indirmeler sırayla ve aralarında 20–30 saniye beklenerek yapılır.
+
+**Eski şarkılarımın türü boş, ne yapabilirim?**
+Kütüphane > Türler > **Otomatik tür ekle** düğmesi türü boş şarkılara Last.fm'den tür yazar.
+Türü dolu olanlara dokunmaz.
+
+**Telefondan sildiğim şarkı tekrar iniyor mu?**
+Hayır. Telefondan silinen şarkı otomatik indirmeye bir daha alınmaz. Şarkıyı sunucudan da silmek
+istersen şarkının menüsünde **Sunucudan sil** seçeneği var.
+
+**Gizli Spotify / YouTube listelerimi aktarabilir miyim?**
+Hayır, yalnızca herkese açık listeler okunabilir. Spotify listelerinin ilk ~100 şarkısı anahtarsız gelir.
+Daha uzun listeler için YAML'a `SPOTIFY_CLIENT_ID` ve `SPOTIFY_CLIENT_SECRET` ekleyebilirsin.
+
+## Geliştiriciler için
+
+- Uygulama: Kotlin, Jetpack Compose, Media3 (ExoPlayer). Servis: Python, FastAPI, yt-dlp, shazamio.
+- `main` dalına her gönderimde GitHub Actions APK'yı derleyip Releases'a koyar.
+- İmza anahtarı depoda tutulmaz. Kendi kopyanda Settings > Secrets and variables > Actions altına
+  `KEYSTORE_BASE64` adıyla anahtar dosyasının base64 halini ekle (`base64 -w0 debug.keystore`).
+  Aynı anahtarla imzalanmayan APK eskisinin üzerine kurulmaz.
