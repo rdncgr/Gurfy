@@ -1,0 +1,17 @@
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+__pycache__/
+_kaynak/
+.tools/
+.gradle-home/
+*.apk
+server/*.local.yaml
+.kotlin/
+
+# Yerel araclar (derleme betigi, emulator baslatici) ve imza anahtari GitHub'a gonderilmez
+derle.sh
+telefon.bat
+keystore/

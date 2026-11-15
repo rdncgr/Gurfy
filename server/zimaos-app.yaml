@@ -1,0 +1,55 @@
+# ZimaOS > Uygulama Mağazası > "Özelleştirilmiş Uygulama Yükle" > "İçe aktar" ile yapıştırın.
+#
+# ÖNCE: app.py dosyasını ZimaOS "Dosyalar" uygulamasıyla şu klasöre yükleyin:
+#   /DATA/AppData/nota-servis/app.py
+#
+# SONRA aşağıda "DEĞİŞTİR" yazan satırları kendinize göre düzenleyin.
+name: nota-servis
+services:
+  nota-servis:
+    image: python:3.12-slim
+    container_name: nota-servis
+    restart: unless-stopped
+    # Her açılışta ffmpeg ve güncel yt-dlp kurulur (YouTube sık değiştiği için güncel kalması önemli).
+    # İlk açılış 1-2 dakika sürebilir.
+    command: >
+      sh -c "apt-get update -qq && apt-get install -y -qq ffmpeg >/dev/null
+      && pip install -q --no-cache-dir -U 'yt-dlp[default]' deno bgutil-ytdlp-pot-provider mutagen fastapi uvicorn requests shazamio
+      && python /app/app.py"
+    # Host ağı: konteyner sunucunun IPv6 adresini de kullanabilsin (YouTube ev bağlantılarının IPv4
+    # adresini sık sık "bot" diye engelliyor, IPv6'yı engellemiyor). Servis yine 8099 portundan açılır.
+    network_mode: host
+    environment:
+      API_KEY: "DEĞİŞTİR-uzun-bir-parola"            # telefondaki uygulamaya da aynısı yazılacak
+      LASTFM_API_KEY: "DEĞİŞTİR-lastfm-anahtarı"     # https://www.last.fm/api/account/create
+      NAVIDROME_URL: "http://192.168.1.101:4533"      # Navidrome adresi (port farklıysa düzeltin)
+      NAVIDROME_USER: "DEĞİŞTİR-navidrome-kullanıcı"
+      NAVIDROME_PASS: "DEĞİŞTİR-navidrome-parola"
+      MUSIC_DIR: /music
+      # İsteğe bağlı: 100 şarkıdan uzun Spotify listeleri için
+      # SPOTIFY_CLIENT_ID: ""
+      # SPOTIFY_CLIENT_SECRET: ""
+    volumes:
+      - /DATA/AppData/nota-servis:/app
+      # DEĞİŞTİR: sol taraf Navidrome'un müzik klasörüyle AYNI olmalı
+      # (Navidrome uygulama ayarlarında /music karşısında yazan yol). Fotoğraf diskine dokunmaz.
+      - /DATA/Media/Music:/music
+    depends_on:
+      - bgutil-provider
+
+  # YouTube "PO Token" sağlayıcısı: yt-dlp'nin bot engeline takılmaması için token üretir (hesap gerekmez).
+  # Yalnızca Nota servisi kullanır; dışarıya port açmaya gerek yok.
+  bgutil-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    container_name: bgutil-provider
+    restart: unless-stopped
+    # Konteynerler aynı ağda olmasa da servis bu porttan sunucunun kendi IP'si üzerinden ulaşır
+    ports:
+      - "4416:4416"
+x-casaos:
+  main: nota-servis
+  port_map: "8099"
+  scheme: http
+  index: /docs
+  title:
+    custom: Nota Servis
