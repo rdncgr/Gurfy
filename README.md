@@ -47,9 +47,12 @@ radyoda duyduğun şarkıyı tanır ve tek dokunuşla arşivine ekler.
 - Spotify ve YouTube listelerini bağlantısıyla içeri aktarma; eksik şarkılar arşive iner
 - İndirmelerin durumunu takip etme, hatalıları tekrar deneme
 
-### 📊 Last.fm
+### 📊 Last.fm ve ListenBrainz
 - Dinlediğin şarkılar Last.fm hesabına işlenir (internet yokken de kaydedilir, sonra gönderilir)
 - Dinleme geçmişine göre öneriler, "Unuttukların" listesi ve dinleme istatistiklerin
+- Benzer sanatçılar Last.fm ve [ListenBrainz](https://listenbrainz.org)'den birlikte bulunur; ikisinin de
+  önerdiği sanatçılar öne çıkar, Last.fm'in bilmediği sanatçılarda ListenBrainz boşluğu doldurur
+- ListenBrainz kullanıcı adını yazarsan haftalık keşif listen de Sana özel önerilere karışır
 
 ### 🦻 İşitme cihazı uyumluluk modu
 Bluetooth işitme cihazlarında (ASHA / LE Audio) kesilmeleri azaltmak için ses ayarları.

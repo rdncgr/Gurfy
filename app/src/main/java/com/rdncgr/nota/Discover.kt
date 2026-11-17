@@ -1054,6 +1054,19 @@ private fun checkAll(): List<Status> {
                 Status("Last.fm hesabı", false, e.message ?: "Kullanıcı bulunamadı")
             }
         }
+        val lbUser = Graph.settings.listenbrainzUser
+        if (lbUser.isNotBlank()) {
+            out += try {
+                val u = Graph.service.listenbrainzUser(lbUser)
+                val n = u.optInt("listens")
+                Status(
+                    "ListenBrainz hesabı", true,
+                    if (n > 0) "$lbUser · $n dinleme" else "$lbUser · henüz dinleme yok; öneriler birkaç hafta sonra gelir",
+                )
+            } catch (e: Exception) {
+                Status("ListenBrainz hesabı", false, e.message ?: "Kullanıcı bulunamadı")
+            }
+        }
         out += Status(
             "Servis → Navidrome", h.optBoolean("navidrome"),
             if (h.optBoolean("navidrome")) "İndirilenler kütüphaneye taranıyor"
@@ -1083,6 +1096,7 @@ private fun ConnectionSettings() {
     var serviceUrl by remember { mutableStateOf(s.serviceUrl) }
     var serviceKey by remember { mutableStateOf(s.serviceKey) }
     var lastfmUser by remember { mutableStateOf(s.lastfmUser) }
+    var lbUser by remember { mutableStateOf(s.listenbrainzUser) }
     var statuses by remember { mutableStateOf<List<Status>?>(null) }
     var checking by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -1094,6 +1108,7 @@ private fun ConnectionSettings() {
         s.serviceUrl = serviceUrl
         s.serviceKey = serviceKey
         s.lastfmUser = lastfmUser
+        s.listenbrainzUser = lbUser
         Graph.version++
     }
 
@@ -1142,6 +1157,18 @@ private fun ConnectionSettings() {
         )
         Text(
             "Dinleme geçmişin okunur: istatistikler, geçmişine göre öneriler ve unuttukların. Parola gerekmez.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+
+        SectionTitle("ListenBrainz hesabı (isteğe bağlı)")
+        OutlinedTextField(
+            lbUser, { lbUser = it }, singleLine = true, modifier = field,
+            label = { Text("ListenBrainz kullanıcı adı") }, placeholder = { Text("listenbrainz.org'daki adın") },
+        )
+        Text(
+            "Haftalık keşif listen Sana özel önerilere karışır. Navidrome'a girdiğin ListenBrainz anahtarı burada " +
+                "gerekmez; yalnızca kullanıcı adı yeterli.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )

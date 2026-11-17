@@ -34,7 +34,12 @@ private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
 private val lfmUser: String get() = Graph.settings.lastfmUser
 
+private val lbUser: String get() = Graph.settings.listenbrainzUser
+
 private fun lfmReady() = Graph.settings.serviceConfigured && lfmUser.isNotBlank()
+
+/** Sana özel öneriler Last.fm ya da ListenBrainz hesaplarından biriyle çalışır. */
+private fun recommendReady() = Graph.settings.serviceConfigured && (lfmUser.isNotBlank() || lbUser.isNotBlank())
 
 data class LfmArtist(val name: String, val plays: Int)
 data class LfmAlbum(val name: String, val artist: String, val plays: Int, val image: String?)
@@ -47,7 +52,7 @@ private fun trackOf(o: JSONObject): LfmTrack {
     return LfmTrack(
         Suggestion(
             o.optString("artist"), o.optString("title"), null, o.optBoolean("in_library"),
-            note = because?.let { "$it dinlediğin için" },
+            note = o.strOrNull("note") ?: because?.let { "$it dinlediğin için" },
         ),
         o.optInt("plays"), song,
     )
@@ -65,7 +70,9 @@ object LastFmApi {
     }
 
     fun recommend(refresh: Boolean): List<Suggestion> =
-        Graph.service.lastfm("recommend?user=${enc(lfmUser)}" + if (refresh) "&refresh=true" else "")
+        Graph.service.lastfm(
+            "recommend?user=${enc(lfmUser)}&lb_user=${enc(lbUser)}" + if (refresh) "&refresh=true" else "",
+        )
             .list("tracks").map { trackOf(it).suggestion }
 
     fun topLibrary(period: String, limit: Int): List<Song> =
@@ -81,8 +88,8 @@ private fun NeedLastFm(nav: Nav) {
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         EmptyNote(
             if (!Graph.settings.serviceConfigured) "Bunun için önce Ayarlar > Bağlantılar'dan Nota servisini girin."
-            else "Dinleme geçmişine göre öneri için Ayarlar > Bağlantılar'a Last.fm kullanıcı adını yazın " +
-                "(Navidrome'un scrobble ettiği hesap).",
+            else "Dinleme geçmişine göre öneri için Ayarlar > Bağlantılar'a Last.fm ya da ListenBrainz " +
+                "kullanıcı adını yazın (Navidrome'un dinlemeleri gönderdiği hesap).",
         )
         Button(onClick = { nav.tab(Screen.SettingsScreen) }, modifier = Modifier.padding(horizontal = 24.dp)) {
             Text("Ayarlara git")
@@ -94,9 +101,9 @@ private fun NeedLastFm(nav: Nav) {
 
 @Composable
 fun RecommendTab(nav: Nav) {
-    if (!lfmReady()) { NeedLastFm(nav); return }
+    if (!recommendReady()) { NeedLastFm(nav); return }
     var refresh by remember { mutableIntStateOf(0) }
-    val state by load("lfm-recommend", lfmUser, refresh) { LastFmApi.recommend(refresh > 0) }
+    val state by load("lfm-recommend", lfmUser + "|" + lbUser, refresh) { LastFmApi.recommend(refresh > 0) }
     val queued = remember { mutableStateMapOf<String, Boolean>() }
     fun key(s: Suggestion) = s.artist.lowercase() + "|" + s.title.lowercase()
 
@@ -104,7 +111,8 @@ fun RecommendTab(nav: Nav) {
         item {
             Text(
                 "Son bir ay ve bir yılda en çok dinlediğin sanatçılara benzeyen, henüz pek dinlemediğin sanatçıların " +
-                    "sevilen şarkıları. Kütüphanende olmayanlar listelenir.",
+                    "sevilen şarkıları; ListenBrainz hesabın varsa haftalık keşif listen de karışır. " +
+                    "Kütüphanende olmayanlar listelenir.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )

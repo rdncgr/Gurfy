@@ -241,6 +241,153 @@ def as_list(x):
     return x if isinstance(x, list) else [x]
 
 
+# ---------------------------------------------------------------- ListenBrainz
+# Benzer sanatçılarda Last.fm'e ikinci kaynak, kişisel haftalık keşif listesi.
+# Okuma için anahtar gerekmez; yalnızca kullanıcı adı. Sanatçılar MusicBrainz kimliğiyle (MBID) tanınır.
+
+LB_UA = {"User-Agent": "NotaServis/1.0 ( https://github.com/rdncgr/Nota )", "Accept": "application/json"}
+LB_SIMILAR_ALGO = "session_based_days_7500_session_300_contribution_5_threshold_10_limit_100_filter_True_skip_30"
+MBID_CACHE = Path(os.getenv("MBID_CACHE", "/app/mbid.json"))
+_mb_lock = threading.Lock()
+_mb_last = [0.0]
+_mbids: dict = {}
+_mbids_loaded = [False]
+
+
+def _mbid_load() -> None:
+    if _mbids_loaded[0]:
+        return
+    _mbids_loaded[0] = True
+    try:
+        _mbids.update(json.loads(MBID_CACHE.read_text(encoding="utf-8")))
+    except Exception:
+        pass
+
+
+def _mbid_save() -> None:
+    try:
+        MBID_CACHE.write_text(json.dumps(_mbids, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def artist_mbid(name: str) -> Optional[str]:
+    """Sanatçının MusicBrainz kimliği; bulunamayan da kaydedilir ki tekrar sorulmasın.
+    MusicBrainz saniyede bir istek ister, bu yüzden istekler sıraya girer."""
+    key = norm(name)
+    if not key:
+        return None
+    with _mb_lock:
+        _mbid_load()
+        if key in _mbids:
+            return _mbids[key] or None
+        found = None
+        for attempt in range(3):
+            wait = 1.1 - (time.time() - _mb_last[0])
+            if wait > 0:
+                time.sleep(wait)
+            _mb_last[0] = time.time()
+            try:
+                r = requests.get("https://musicbrainz.org/ws/2/artist/", headers=LB_UA, timeout=15,
+                                 params={"query": f'artist:"{name}"', "fmt": "json", "limit": 3})
+            except requests.RequestException:
+                return None  # ağ hatası: kaydetme, sonra tekrar denensin
+            if r.status_code == 503:
+                time.sleep(2 + attempt * 2)
+                continue
+            if r.status_code != 200:
+                return None
+            for a in r.json().get("artists", []):
+                names = [a.get("name", "")] + [x.get("name", "") for x in a.get("aliases", []) or []]
+                if int(a.get("score") or 0) >= 90 and any(norm(n) == key for n in names):
+                    found = a.get("id")
+                    break
+            break
+        else:
+            return None
+        _mbids[key] = found or ""
+        _mbid_save()
+        return found
+
+
+def lb_similar_artists(name: str) -> List[tuple]:
+    """ListenBrainz'e göre benzer sanatçılar: [(ad, 0..1 puan)]."""
+    def build():
+        mbid = artist_mbid(name)
+        if not mbid:
+            return []
+        try:
+            r = requests.get("https://labs.api.listenbrainz.org/similar-artists/json", headers=LB_UA, timeout=20,
+                             params={"artist_mbids": mbid, "algorithm": LB_SIMILAR_ALGO})
+            rows = r.json() if r.status_code == 200 else []
+        except Exception:
+            return []
+        rows = [x for x in rows if isinstance(x, dict) and x.get("name")] if isinstance(rows, list) else []
+        top = max([float(x.get("score") or 0) for x in rows] or [1.0]) or 1.0
+        return [(x["name"], float(x.get("score") or 0) / top) for x in rows[:40]]
+    return cached(("lb-similar", norm(name)), 7 * 24 * 3600, build)
+
+
+def lfm_similar_artists(name: str, limit: int = 20) -> List[tuple]:
+    if not LASTFM_API_KEY:
+        return []
+    data = lastfm("artist.getSimilar", artist=name, limit=limit)
+    return [(x.get("name", ""), float(x.get("match") or 0))
+            for x in as_list(data.get("similarartists", {}).get("artist")) if x.get("name")]
+
+
+def similar_artists(name: str, limit: int = 12) -> List[tuple]:
+    """Last.fm ve ListenBrainz birleşik: ikisinin de benzer dediği sanatçılar öne çıkar."""
+    with ThreadPoolExecutor(2) as ex:
+        f_lfm = ex.submit(lfm_similar_artists, name, 25)
+        f_lb = ex.submit(lb_similar_artists, name)
+        lists = [f_lfm.result(), f_lb.result()]
+    # Last.fm verisi daha geniş (özellikle arabesk / halk): ana kaynak o, ListenBrainz daha düşük ağırlıkla
+    # eklenir; ikisinin de benzer dediği sanatçı, iki puanın küçüğü kadar ek puan alır.
+    weights = (1.0, 0.6)
+    score, label, per = {}, {}, ({}, {})
+    for lst, w, d in zip(lists, weights, per):
+        for n, m in lst:
+            k = norm(n)
+            if not k or k == norm(name):
+                continue
+            d[k] = max(d.get(k, 0.0), m)
+            score[k] = score.get(k, 0.0) + m * w
+            label.setdefault(k, n)
+    for k in set(per[0]) & set(per[1]):
+        score[k] += 0.5 * min(per[0][k], per[1][k])
+    best = sorted(score, key=score.get, reverse=True)[:limit]
+    return [(label[k], score[k]) for k in best]
+
+
+def lb_get(path: str, **params):
+    r = requests.get("https://api.listenbrainz.org/1/" + path, headers=LB_UA, params=params, timeout=20)
+    if r.status_code == 404:
+        raise HTTPException(404, "ListenBrainz kullanıcısı bulunamadı")
+    if r.status_code != 200:
+        raise HTTPException(502, f"ListenBrainz cevap vermedi ({r.status_code})")
+    return r.json()
+
+
+def lb_exploration(user: str) -> List[dict]:
+    """ListenBrainz'in kullanıcıya her hafta hazırladığı keşif listesindeki şarkılar."""
+    def build():
+        lists = lb_get(f"user/{quote(user)}/playlists/createdfor", count=25).get("playlists", [])
+        pick = None
+        for item in lists:
+            pl = item.get("playlist", {})
+            if "exploration" in (pl.get("title") or "").lower():
+                pick = pl
+                break
+        if not pick:
+            return []
+        pid = (pick.get("identifier") or "").rstrip("/").split("/")[-1]
+        tracks = lb_get(f"playlist/{pid}").get("playlist", {}).get("track", [])
+        return [{"artist": t.get("creator", ""), "title": t.get("title", ""),
+                 "note": "ListenBrainz haftalık keşif"} for t in tracks if t.get("title") and t.get("creator")]
+    return cached(("lb-explore", norm(user)), 6 * 3600, build)
+
+
 def similar_tracks(artist: str, title: str, limit: int) -> List[dict]:
     out, seen = [], set()
 
@@ -257,8 +404,7 @@ def similar_tracks(artist: str, title: str, limit: int) -> List[dict]:
 
     # Şarkıya göre sonuç azsa sanatçıya göre tamamla
     if len(out) < limit // 2 and artist:
-        data = lastfm("artist.getSimilar", artist=artist, limit=8)
-        names = [a.get("name", "") for a in as_list(data.get("similarartists", {}).get("artist"))]
+        names = [n for n, _ in similar_artists(artist, 8)]
         for name in [artist] + names:
             if len(out) >= limit:
                 break
@@ -1012,6 +1158,7 @@ def charts(scope: str = "tr", limit: int = 50):
 # istatistikler, geçmişe göre öneriler ve "unuttukların". Okumak için yetki gerekmez.
 
 from concurrent.futures import ThreadPoolExecutor
+from itertools import zip_longest
 
 LASTFM_PERIODS = {"7day", "1month", "3month", "6month", "12month", "overall"}
 _lfm_cache = {}  # anahtar -> (zaman, veri)
@@ -1109,7 +1256,7 @@ def lastfm_stats(user: str, period: str = "1month"):
 
 
 @app.get("/lastfm/recommend", dependencies=[Depends(auth)])
-def lastfm_recommend(user: str, limit: int = 40, refresh: bool = False):
+def lastfm_recommend(user: str = "", limit: int = 40, refresh: bool = False, lb_user: str = ""):
     """Son 1 ay ve 1 yılda en çok dinlenen sanatçılara benzeyen, az dinlenmiş sanatçıların sevilen
     şarkılarından kütüphanede olmayanlar."""
     limit = max(5, min(limit, 80))
@@ -1127,9 +1274,7 @@ def lastfm_recommend(user: str, limit: int = 40, refresh: bool = False):
         seed_list = sorted(seeds, key=seeds.get, reverse=True)[:15]
 
         def similar(name):
-            data = lastfm("artist.getSimilar", artist=name, limit=12)
-            return [(x.get("name", ""), float(x.get("match") or 0))
-                    for x in as_list(data.get("similarartists", {}).get("artist"))]
+            return similar_artists(name, 12)
 
         with ThreadPoolExecutor(5) as ex:
             sims = list(ex.map(similar, seed_list))
@@ -1164,7 +1309,29 @@ def lastfm_recommend(user: str, limit: int = 40, refresh: bool = False):
     key = ("recommend", norm(user), limit)
     if refresh:
         _lfm_cache.pop(key, None)
-    return {"tracks": cached(key, 6 * 3600, build)}
+        _lfm_cache.pop(("lb-explore", norm(lb_user)), None)
+    tracks = cached(key, 6 * 3600, build) if user else []
+    if lb_user:
+        try:
+            lb = [t for t in with_library(lb_exploration(lb_user)[:limit]) if not t["in_library"]]
+        except HTTPException:
+            lb = []
+        # İki kaynağı sırayla karıştır, aynı şarkıyı bir kez göster
+        seen, mixed = set(), []
+        for pair in zip_longest(tracks, lb):
+            for t in pair:
+                k = (norm(t["artist"]), norm(t["title"])) if t else None
+                if t and k not in seen:
+                    seen.add(k)
+                    mixed.append(t)
+        tracks = mixed[:limit]
+    return {"tracks": tracks}
+
+
+@app.get("/listenbrainz/user", dependencies=[Depends(auth)])
+def listenbrainz_user(user: str):
+    data = lb_get(f"user/{quote(user)}/listen-count")
+    return {"name": user, "listens": int((data.get("payload") or {}).get("count") or 0)}
 
 
 @app.get("/lastfm/top-library", dependencies=[Depends(auth)])

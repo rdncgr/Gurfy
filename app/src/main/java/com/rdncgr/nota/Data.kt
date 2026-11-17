@@ -119,6 +119,11 @@ class Settings(ctx: Context) {
         get() = prefs.getString("lastfmUser", "") ?: ""
         set(v) = prefs.edit().putString("lastfmUser", v.trim()).apply()
 
+    /** ListenBrainz kullanıcı adı: haftalık keşif listesi Sana özel önerilere karışır. */
+    var listenbrainzUser: String
+        get() = prefs.getString("listenbrainzUser", "") ?: ""
+        set(v) = prefs.edit().putString("listenbrainzUser", v.trim()).apply()
+
     /** Sık dinlenen şarkıları otomatik olarak telefona indir. */
     var autoOffline: Boolean
         get() = prefs.getBoolean("autoOffline", false)
@@ -577,6 +582,9 @@ class ServiceApi(private val s: Settings) {
 
     /** Last.fm dinleme geçmişi uç noktaları (/lastfm/...). */
     fun lastfm(path: String): JSONObject = get("/lastfm/$path")
+
+    fun listenbrainzUser(user: String): JSONObject =
+        get("/listenbrainz/user?user=" + java.net.URLEncoder.encode(user, "UTF-8"))
 
     /** Türü boş şarkılara Last.fm'den tür yazdırmayı başlatır / durumunu verir. */
     fun startGenreBackfill(): JSONObject = post("/genres/backfill", JSONObject())
