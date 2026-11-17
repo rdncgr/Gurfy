@@ -89,8 +89,9 @@ ayarların ve indirdiklerin silinmez.
    Müzik klasörü Navidrome'unkiyle **aynı** olmalı.
 3. ZimaOS'ta **Özelleştirilmiş Uygulama Yükle > İçe aktar** ile YAML'ı yapıştır.
    Başka bir sistemde `docker compose up -d` yeterli.
-4. İlk açılış 1-2 dakika sürer. Tarayıcıda `http://SUNUCU-ADRESİ:8099/health` adresinde
-   `"ok": true` görüyorsan servis hazırdır.
+4. İlk açılış 1-2 dakika sürer. Sonra ZimaOS'ta Nota Servis simgesine tıkla ya da tarayıcıda
+   `http://SUNUCU-ADRESİ:8099` adresini aç. "Nota servisi çalışıyor" sayfası açılır: uygulamaya yazacağın
+   adresi ve servisin durumunu (Navidrome, Last.fm, YouTube, şarkı tanıma) yeşil / kırmızı olarak gösterir.
 
 ### 3. Uygulamayı bağla
 Uygulamada **Ayarlar > Bağlantılar**:

@@ -26,7 +26,7 @@ from urllib.parse import quote
 
 import requests
 from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 API_KEY = os.getenv("API_KEY", "")
@@ -635,6 +635,60 @@ def health():
             "navidrome_error": nav_error, "navidrome_url": NAVIDROME_URL,
             "spotify_api": bool(SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET),
             "yt_dlp": ytv, "shazam": _has("shazamio"), "music_dir_writable": os.access(MUSIC_DIR, os.W_OK)}
+
+
+STATUS_PAGE = """<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nota servisi</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 108 108'%3E%3Crect width='108' height='108' rx='24' fill='%23F2B84B'/%3E%3Cpath fill='%23121417' transform='translate(-8 4)' d='M48,34 L48,62 A9,9 0 1,0 54,70.5 L54,44 L70,40 L70,56 A9,9 0 1,0 76,64.5 L76,28 Z'/%3E%3C/svg%3E">
+<style>
+:root{--bg:#121417;--card:#1b1e23;--text:#f5f1e8;--muted:#9aa0a6;--amber:#f2b84b;--ok:#7bc47f;--bad:#e5735c;--off:#6b7078}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 "Segoe UI",system-ui,sans-serif}
+main{max-width:640px;margin:0 auto;padding:32px 16px 48px}
+.brand{display:flex;align-items:center;gap:14px}.logo{width:52px;height:52px;border-radius:14px;background:var(--amber);display:grid;place-items:center}
+h1{margin:0;font-size:30px}.lead{color:var(--muted);margin:6px 0 24px}
+.card{background:var(--card);border-radius:14px;padding:18px 20px;margin-bottom:16px}
+h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px}
+.addr{font:600 20px/1.3 ui-monospace,Consolas,monospace;color:var(--amber);word-break:break-all}
+ol{margin:8px 0 0;padding-left:20px}li{margin:4px 0}
+.row{display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-top:1px solid #262a30}.row:first-of-type{border-top:0}
+.dot{flex:none;width:10px;height:10px;border-radius:50%;margin-top:8px;background:var(--off)}.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}
+.row b{display:block;font-weight:600}.row span{color:var(--muted);font-size:14px}
+footer{color:var(--muted);font-size:13px;text-align:center}footer a{color:var(--muted)}
+</style></head><body><main>
+<div class="brand"><div class="logo"><svg width="34" height="34" viewBox="22 22 64 64"><path fill="#121417" d="M48,34 L48,62 A9,9 0 1,0 54,70.5 L54,44 L70,40 L70,56 A9,9 0 1,0 76,64.5 L76,28 Z"/></svg></div>
+<div><h1>Nota servisi çalışıyor</h1></div></div>
+<p class="lead">Bu servis, Nota uygulaması için şarkı bulur, indirir ve radyoda çalan şarkıyı tanır. Bu sayfada yapman gereken bir şey yok; yalnızca uygulamayı bağlamak için aşağıdaki adresi kullan.</p>
+<div class="card"><h2>Uygulamayı bağla</h2>
+<div class="addr" id="addr"></div>
+<ol><li>Telefonda Nota'yı aç, <b>Ayarlar &gt; Bağlantılar</b>'a git.</li>
+<li><b>Nota servisi &gt; Adres</b> kutusuna yukarıdaki adresi yaz.</li>
+<li><b>Servis parolası</b> kutusuna kurulumda YAML'da <code>API_KEY</code> olarak belirlediğin parolayı yaz.</li>
+<li><b>Kaydet ve bağlantıları sına</b>'ya dokun.</li></ol></div>
+<div class="card"><h2>Durum</h2><div id="status"><div class="row"><div class="dot"></div><div><b>Kontrol ediliyor…</b></div></div></div></div>
+<footer>Geliştiriciler için: <a href="/docs">API belgeleri</a></footer>
+</main><script>
+document.getElementById('addr').textContent = location.origin;
+const items = h => [
+ ["Navidrome", h.navidrome, h.navidrome ? "Bağlı; indirilen şarkılar kütüphaneye eklenir" : (h.navidrome_error || "Bağlanılamıyor")],
+ ["Müzik klasörü", h.music_dir_writable, h.music_dir_writable ? "Yazılabilir" : "Servis müzik klasörüne yazamıyor"],
+ ["Last.fm", h.lastfm, h.lastfm ? "Benzer şarkılar, türler ve öneriler açık" : "YAML'da LASTFM_API_KEY yok"],
+ ["YouTube indirme", h.yt_dlp ? true : false, h.yt_dlp ? "yt-dlp " + h.yt_dlp : "yt-dlp kurulu değil"],
+ ["YouTube bot koruması", h.po_token, h.po_token ? "PO token sağlayıcısı çalışıyor" : "bgutil-provider konteynerine ulaşılamıyor"],
+ ["YouTube IPv6", h.youtube_ipv6, h.youtube_ipv6 ? "IPv6 ile çıkılıyor" : "Yalnızca IPv4; bot engeli daha sık olabilir"],
+ ["Radyoda şarkı tanıma", h.shazam, h.shazam ? "Hazır" : "shazamio kurulu değil"],
+];
+fetch('/health').then(r => r.json()).then(h => {
+ document.getElementById('status').innerHTML = items(h).map(([t, ok, d]) =>
+  `<div class="row"><div class="dot ${ok ? 'ok' : 'bad'}"></div><div><b>${t}</b><span></span></div></div>`).join('');
+ document.querySelectorAll('#status .row span').forEach((s, i) => s.textContent = items(h)[i][2]);
+}).catch(() => { document.getElementById('status').innerHTML = '<div class="row"><div class="dot bad"></div><div><b>Durum alınamadı</b></div></div>'; });
+</script></body></html>"""
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def status_page():
+    return STATUS_PAGE
 
 
 @app.get("/similar", dependencies=[Depends(auth)])

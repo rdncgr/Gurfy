@@ -50,6 +50,13 @@ x-casaos:
   main: nota-servis
   port_map: "8099"
   scheme: http
-  index: /docs
+  index: /
   title:
     custom: Nota Servis
+  icon: https://raw.githubusercontent.com/rdncgr/Nota/main/docs/icon.png
+  tagline:
+    en_us: Nota müzik uygulamasının sunucu servisi
+    custom: Nota müzik uygulamasının sunucu servisi
+  description:
+    en_us: Nota uygulaması için şarkı bulur, YouTube'dan indirip Navidrome arşivine ekler ve radyoda çalan şarkıyı tanır.
+    custom: Nota uygulaması için şarkı bulur, YouTube'dan indirip Navidrome arşivine ekler ve radyoda çalan şarkıyı tanır.
