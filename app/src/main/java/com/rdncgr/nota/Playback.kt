@@ -265,7 +265,7 @@ class PlayerController(private val ctx: Context) {
         Graph.scope.launch {
             try {
                 val songs = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { source() }
-                if (songs.isEmpty()) Graph.toast("Kütüphanede şarkı yok") else play(songs, 0)
+                if (songs.isEmpty()) Graph.toast("Kütüphanede şarkı yok") else play(songs, 0, ordered = true)
             } catch (e: Exception) {
                 Graph.toast(e.message ?: "Bağlantı kurulamadı")
             } finally {
@@ -381,16 +381,29 @@ class PlayerController(private val ctx: Context) {
             .build()
     }
 
-    fun play(songs: List<Song>, start: Int = 0, shuffled: Boolean = false) {
+    /**
+     * [ordered]: "Çal" / "Karışık" düğmeleri gibi listenin tamamını isteyen çağrılar.
+     * Sana özel karışık açıkken bir şarkıya dokunulursa (ordered = false) o şarkı çalar,
+     * ardından listenin geri kalanı yerine sana özel karışık gelir.
+     */
+    fun play(songs: List<Song>, start: Int = 0, shuffled: Boolean = false, ordered: Boolean = false) {
         if (songs.isEmpty()) return
         Preview.stop()
-        queue = songs
-        index = start.coerceIn(0, songs.size - 1)
+        val from = start.coerceIn(0, songs.size - 1)
+        val seed = mode == PlayMode.SMART && !ordered && !shuffled && !songs[0].isRadio && songs.size > 1
+        if (seed) {
+            queue = listOf(songs[from])
+            index = 0
+        } else {
+            queue = songs
+            index = from
+        }
+        val list = queue
         withController { c ->
             c.shuffleModeEnabled =
-                if (songs[0].isRadio) radioShuffle else shuffled || mode == PlayMode.SHUFFLE
-            c.repeatMode = if (songs[0].isRadio) Player.REPEAT_MODE_OFF else repeat
-            c.setMediaItems(songs.map(::toItem), index, 0L)
+                if (list[0].isRadio) radioShuffle else shuffled || mode == PlayMode.SHUFFLE
+            c.repeatMode = if (list[0].isRadio) Player.REPEAT_MODE_OFF else repeat
+            c.setMediaItems(list.map(::toItem), index, 0L)
             c.prepare()
             c.play()
             maybeExtend(c)

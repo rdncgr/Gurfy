@@ -212,12 +212,12 @@ fun PlayButtons(songs: List<Song>) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Button(onClick = { Graph.player.play(songs, 0) }) {
+        Button(onClick = { Graph.player.play(songs, 0, ordered = true) }) {
             Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
             Text("Çal")
         }
-        OutlinedButton(onClick = { Graph.player.play(songs.shuffled(), 0) }) {
+        OutlinedButton(onClick = { Graph.player.play(songs.shuffled(), 0, ordered = true) }) {
             Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
             Text("Karışık")
@@ -286,6 +286,15 @@ fun HomeScreen(nav: Nav) {
     var refresh by remember { mutableIntStateOf(0) }
     var creating by remember { mutableStateOf(false) }
     val p = Graph.player
+    // Navidrome'a erişim: açılışta, yenilemede ve 30 sn'de bir denetlenir
+    val serverOk by produceState<Boolean?>(null, refresh) {
+        while (true) {
+            value = withContext(Dispatchers.IO) {
+                try { Graph.subsonic.ping(); true } catch (e: Exception) { false }
+            }
+            kotlinx.coroutines.delay(30_000)
+        }
+    }
     if (creating) {
         NameDialog("Yeni liste", confirm = "Oluştur", onDismiss = { creating = false }) { name ->
             createPlaylist(name)
@@ -310,7 +319,13 @@ fun HomeScreen(nav: Nav) {
             IconButton(onClick = { creating = true }) {
                 Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Yeni liste")
             }
-            IconButton(onClick = { refresh++ }) { Icon(Icons.Filled.Refresh, contentDescription = "Yenile") }
+            // Sunucuya ulaşılamıyorsa yenile düğmesi kırmızı X olur (dokununca yeniden dener)
+            IconButton(onClick = { refresh++ }) {
+                if (serverOk == false) Icon(
+                    Icons.Filled.Close, contentDescription = "Sunucuya ulaşılamıyor, yeniden dene",
+                    tint = MaterialTheme.colorScheme.error,
+                ) else Icon(Icons.Filled.Refresh, contentDescription = "Yenile")
+            }
         }
         // Mod etkinken altında kısa bir not: hangi modda olduğun anlaşılsın
         if (p.mode != PlayMode.OFF) {
@@ -429,10 +444,21 @@ fun AlbumStrip(state: Load<List<Album>>, nav: Nav) {
 @Composable
 fun LibraryScreen(nav: Nav) {
     val tab = LibraryTab.selected
-    val titles = listOf("Albümler", "Sanatçılar", "Türler", "Listeler", "Radyo")
+    val titles = listOf("Şarkılar", "Sanatçılar", "Türler", "Listeler", "Radyo")
+    var creating by remember { mutableStateOf(false) }
+    if (creating) {
+        NameDialog("Yeni liste", confirm = "Oluştur", onDismiss = { creating = false }) { name ->
+            createPlaylist(name)
+            creating = false
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         Header("Kütüphane", nav) {
+            // Yeni liste düğmesi yalnızca Listeler sekmesinde
+            if (tab == 3) IconButton(onClick = { creating = true }) {
+                Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Yeni liste")
+            }
             IconButton(onClick = { nav.push(Screen.Stats) }) {
                 Icon(Icons.Filled.Insights, contentDescription = "Dinleme istatistiklerim")
             }
@@ -445,14 +471,18 @@ fun LibraryScreen(nav: Nav) {
                 )
             }
         }
-        when (tab) {
+        SwipePages(tab, titles.size, { LibraryTab.selected = it }) { page -> when (page) {
             4 -> RadioTab()
             2 -> GenresTab(nav)
             0 -> {
-                val albums by load("albums") { Graph.subsonic.albums("alphabeticalByName", 500) }
-                LoadBox(albums) { list ->
-                    if (list.isEmpty()) EmptyNote("Kütüphanede albüm yok.")
-                    LazyColumn(Modifier.fillMaxSize()) { items(list) { AlbumRow(it, nav) } }
+                val songs by load("all-songs", Graph.listsVersion) { Graph.subsonic.allSongs() }
+                LoadBox(songs) { list ->
+                    if (list.isEmpty()) EmptyNote("Kütüphanede şarkı yok.")
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        itemsIndexed(list, key = { i, s -> "$i" + s.id }) { i, s ->
+                            SongRow(s, nav) { Graph.player.play(list, i) }
+                        }
+                    }
                 }
             }
             1 -> {
@@ -467,33 +497,16 @@ fun LibraryScreen(nav: Nav) {
             }
             else -> {
                 val playlists by load("playlists", Graph.listsVersion) { Graph.subsonic.playlists() }
-                var creating by remember { mutableStateOf(false) }
-                if (creating) {
-                    NameDialog("Yeni liste", confirm = "Oluştur", onDismiss = { creating = false }) { name ->
-                        createPlaylist(name)
-                        creating = false
-                    }
-                }
                 LoadBox(playlists) { list ->
                     LazyColumn(Modifier.fillMaxSize()) {
-                        item {
-                            OutlinedButton(
-                                onClick = { creating = true },
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            ) {
-                                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Yeni liste")
-                            }
-                        }
-                        if (list.isEmpty()) item { EmptyNote("Henüz çalma listesi yok.") }
+                        if (list.isEmpty()) item { EmptyNote("Henüz çalma listesi yok. Sağ üstteki + simgesiyle oluştur.") }
                         items(list) { p ->
                             SimpleRow(p.name, "${p.songCount} şarkı") { nav.push(Screen.PlaylistDetail(p.id, p.name)) }
                         }
                     }
                 }
             }
-        }
+        } }
     }
 }
 

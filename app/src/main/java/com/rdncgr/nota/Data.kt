@@ -331,6 +331,23 @@ class Subsonic(private val s: Settings, private val cacheDir: File) {
     fun artistAlbums(id: String): List<Album> =
         call("getArtist", "id" to id).optJSONObject("artist")?.list("album")?.map(::albumOf) ?: emptyList()
 
+    /** Kütüphanedeki bütün şarkılar, ada göre (Navidrome boş aramada hepsini döndürür). */
+    fun allSongs(max: Int = 10000): List<Song> {
+        val out = mutableListOf<Song>()
+        var offset = 0
+        while (out.size < max) {
+            val page = call(
+                "search3", "query" to "", "songCount" to "500", "songOffset" to offset.toString(),
+                "albumCount" to "0", "artistCount" to "0",
+            ).optJSONObject("searchResult3")?.list("song")?.map(::songOf) ?: emptyList()
+            out += page
+            if (page.size < 500) break
+            offset += 500
+        }
+        val tr = java.text.Collator.getInstance(java.util.Locale("tr"))
+        return out.sortedWith { a, b -> tr.compare(a.title, b.title) }
+    }
+
     fun search(query: String): SearchResult {
         val r = call("search3", "query" to query, "songCount" to "40", "albumCount" to "15", "artistCount" to "10")
             .optJSONObject("searchResult3") ?: return SearchResult(emptyList(), emptyList(), emptyList())

@@ -221,28 +221,11 @@ fun DiscoverScreen(nav: Nav) {
     )
 
     Column(Modifier.fillMaxSize()) {
-        Header("Keşfet", nav)
-        // Kısayollar: hangi sekmede olunursa olunsun erişilebilir. Arama alttaki "Ara" menüsünde.
-        val playing = Graph.player.current?.takeIf { !it.isRadio }
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (playing != null) AssistChip(
-                onClick = { nav.push(Screen.Similar(playing.artist, playing.title)) },
-                label = { Text("Çalana benzerler") },
-                leadingIcon = { Icon(Icons.Filled.TravelExplore, contentDescription = null, modifier = Modifier.size(18.dp)) },
-            )
-            AssistChip(
-                onClick = { nav.push(Screen.Import) },
-                label = { Text("Liste aktar") },
-                leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null, modifier = Modifier.size(18.dp)) },
-            )
-            AssistChip(
-                onClick = { nav.push(Screen.Stats) },
-                label = { Text("İstatistiklerim") },
-                leadingIcon = { Icon(Icons.Filled.Insights, contentDescription = null, modifier = Modifier.size(18.dp)) },
-            )
+        Header("Keşfet", nav) {
+            // Kütüphane'deki istatistik simgesiyle aynı yerde
+            IconButton(onClick = { nav.push(Screen.Import) }) {
+                Icon(Icons.Filled.AddLink, contentDescription = "Liste aktar (Spotify / YouTube)")
+            }
         }
         PrimaryScrollableTabRow(selectedTabIndex = DiscoverTab.selected.coerceIn(0, tabs.size - 1), edgePadding = 8.dp) {
             tabs.forEachIndexed { i, (label, icon, badge) ->
@@ -259,18 +242,20 @@ fun DiscoverScreen(nav: Nav) {
             }
         }
         val service = Graph.settings.serviceConfigured
-        when {
-            DiscoverTab.selected == 0 -> SearchContent(nav)
-            !service -> Column {
-                EmptyNote("Öneriler, popüler listeler ve indirme için önce Ayarlar > Bağlantılar'dan Nota servis adresini girin.")
-                Button(onClick = { nav.tab(Screen.SettingsScreen) }, modifier = Modifier.padding(horizontal = 24.dp)) {
-                    Text("Ayarlara git")
+        SwipePages(DiscoverTab.selected, tabs.size, { DiscoverTab.selected = it }) { page ->
+            when {
+                page == 0 -> SearchContent(nav)
+                !service -> Column(Modifier.fillMaxSize()) {
+                    EmptyNote("Öneriler, popüler listeler ve indirme için önce Ayarlar > Bağlantılar'dan Nota servis adresini girin.")
+                    Button(onClick = { nav.tab(Screen.SettingsScreen) }, modifier = Modifier.padding(horizontal = 24.dp)) {
+                        Text("Ayarlara git")
+                    }
                 }
+                page == 1 -> RecommendTab(nav)
+                page == 2 -> ChartsTab()
+                page == 3 -> HeardTab()
+                else -> JobsTab(jobs)
             }
-            DiscoverTab.selected == 1 -> RecommendTab(nav)
-            DiscoverTab.selected == 2 -> ChartsTab()
-            DiscoverTab.selected == 3 -> HeardTab()
-            else -> JobsTab(jobs)
         }
     }
 }
@@ -755,10 +740,14 @@ fun OfflineSettings() {
     val savedCount = Graph.offline.downloaded.size
     val usedMb = remember(savedCount) { Graph.offline.usedBytes() / (1024 * 1024) }
 
-    SectionTitle("Sık dinlenenleri telefona indir")
+    InfoTitle(
+        "Telefona indirme",
+        "En çok dinlediğin şarkılar telefona kaydedilir; internet yokken de çalmaya devam eder. " +
+            "Telefondan sildiğin şarkılar yeniden indirilmez.",
+    )
     SwitchRow(
         "Sık dinlenenleri otomatik indir",
-        "En çok dinlediğin şarkılar telefona kaydedilir; internet yokken de çalmaya devam eder.",
+        "İnternetsiz de çalsın",
         auto,
     ) {
         auto = it
@@ -785,7 +774,7 @@ fun OfflineSettings() {
                 )
             }
         }
-        SwitchRow("Sadece Wi-Fi'da indir", "Mobil veriyi harcamaz.", wifi) {
+        SwitchRow("Sadece Wi-Fi'da indir", "Mobil veri harcamaz", wifi) {
             wifi = it
             s.wifiOnly = it
         }
@@ -831,18 +820,20 @@ fun SettingsScreen(nav: Nav) {
             settingsTabs.forEachIndexed { i, t ->
                 Tab(
                     selected = tab == i, onClick = { tab = i },
-                    text = { Text(t, maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelMedium) },
+                    text = { Text(t, maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelSmall) },
                 )
             }
         }
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            when (tab) {
-                0 -> HomeSettings()
-                1 -> PlaybackSettings()
-                2 -> OfflineSettings()
-                else -> ConnectionSettings()
+        SwipePages(tab, settingsTabs.size, { tab = it }) { page ->
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                when (page) {
+                    0 -> HomeSettings()
+                    1 -> PlaybackSettings()
+                    2 -> OfflineSettings()
+                    else -> ConnectionSettings()
+                }
+                Spacer(Modifier.height(24.dp))
             }
-            Spacer(Modifier.height(24.dp))
         }
     }
 }
@@ -851,12 +842,7 @@ fun SettingsScreen(nav: Nav) {
 
 @Composable
 private fun HomeSettings() {
-    SectionTitle("Ana sayfa bölümleri")
-    Text(
-        "Okları kullanarak sırayı değiştir, anahtarla bölümü gizle ya da göster.",
-        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-    )
+    InfoTitle("Ana sayfa bölümleri", "Oklarla sırala, anahtarla gizle ya da göster.")
     val sections = HomeLayout.sections
     sections.forEachIndexed { i, sec ->
         Row(
@@ -886,18 +872,16 @@ private fun HomeSettings() {
 @Composable
 private fun PlaybackSettings() {
     val p = Graph.player
-    SectionTitle("Karışık çalma modu")
-    Text(
-        "Ana sayfadaki ve çalar ekranındaki karışık düğmesi her basışta bu modlar arasında geçer. " +
-            "Seçtiğin mod sonraki çalmalarda da geçerli kalır.",
-        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+    InfoTitle(
+        "Karışık çalma modu",
+        "Ana sayfadaki ve çalardaki karışık düğmesi her basışta bu modlar arasında geçer; seçim kalıcıdır. " +
+            "Sana özel karışık: beğenilerin, sevdiğin türler, en çok dinlediklerin, unuttukların ve yeni eklenenler " +
+            "harmanlanır; hep atladığın şarkılar girmez.",
     )
     val descriptions = mapOf(
-        PlayMode.OFF to "Albüm ve listeler sırasıyla çalar.",
-        PlayMode.SHUFFLE to "Çalınan sıra karıştırılır. Hiçbir şey çalmıyorsa kütüphaneden rastgele şarkılar başlar.",
-        PlayMode.SMART to "Sıra bitince beğenilerin, sevdiğin türler, son ayın en çokları (Last.fm), son dinlediklerin, " +
-            "unuttukların ve son eklenenlerden harmanlanan şarkılarla devam eder. Son 3 çalışında hep atladığın şarkılar girmez.",
+        PlayMode.OFF to "Liste sırasıyla çalar",
+        PlayMode.SHUFFLE to "Aynı liste karışık sırayla",
+        PlayMode.SMART to "Şarkıdan sonra sana göre seçilenler",
     )
     PlayMode.entries.forEach { m ->
         Row(
@@ -924,14 +908,10 @@ private fun HearingSettings() {
     var mode by remember { mutableIntStateOf(HearingMode.setting()) }
     var mono by remember { mutableStateOf(Graph.settings.hearingMono) }
 
-    SectionTitle("İşitme cihazı uyumluluk modu")
-    Text(
-        "İşitme cihazlarına Bluetooth ile müzik giderken yaşanan kesilmeleri azaltır: ses tamponu büyütülür, " +
-            "tüm şarkılar tek örnekleme hızında (48 kHz) çalınır, duraklatınca ya da internet yavaşlayınca hat " +
-            "sessizlikle açık tutulur. Bedeli: çal/duraklat yarım saniye kadar geç tepki verir. " +
-            "Değişiklik bir sonraki şarkıdan itibaren geçerli olur.",
-        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+    InfoTitle(
+        "İşitme cihazı modu",
+        "Bluetooth işitme cihazlarında kesilmeleri azaltır: ses tamponu büyür, şarkılar 48 kHz'de çalar, " +
+            "duraklatınca hat açık tutulur. Çal / duraklat yarım saniye geç tepki verir; değişiklik sonraki şarkıda geçerli olur.",
     )
     // Durum satırı: bağlı cihaz ve modun şu an etkin olup olmadığı
     val dev = HearingMode.device
@@ -949,9 +929,9 @@ private fun HearingSettings() {
         )
     }
     val options = listOf(
-        Triple(HearingMode.OFF, "Kapalı", "Hiçbir zaman devreye girmez."),
-        Triple(HearingMode.AUTO, "Otomatik", "İşitme cihazı (ASHA ya da LE Audio) bağlanınca kendiliğinden açılır."),
-        Triple(HearingMode.ALWAYS, "Her zaman açık", "Cihaz tanınmasa da açık kalır (bazı cihazlar normal kulaklık gibi görünür)."),
+        Triple(HearingMode.OFF, "Kapalı", ""),
+        Triple(HearingMode.AUTO, "Otomatik", "İşitme cihazı bağlanınca açılır"),
+        Triple(HearingMode.ALWAYS, "Her zaman açık", "Cihaz tanınmasa da açık kalır"),
     )
     options.forEach { (value, title, desc) ->
         Row(
@@ -961,14 +941,13 @@ private fun HearingSettings() {
             RadioButton(selected = mode == value, onClick = { mode = value; HearingMode.setMode(value) })
             Column(Modifier.weight(1f).padding(start = 4.dp)) {
                 Text(title)
-                Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (desc.isNotBlank()) Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
     SwitchRow(
         "Mono ses",
-        "Sol ve sağ kanal karıştırılıp iki kulağa aynısı verilir. Bir kulakta kopma olursa diğer kulak şarkının " +
-            "tamamını duymaya devam eder; bir kulağı daha az duyanlar için de faydalıdır.",
+        "İki kulağa aynı ses; bir taraf koparsa şarkı eksik duyulmaz",
         mono,
     ) {
         mono = it
@@ -1124,7 +1103,7 @@ private fun ConnectionSettings() {
     val field = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
 
     Column {
-        SectionTitle("Navidrome")
+        InfoTitle("Navidrome", "Müzik arşivinin sunucusu. Ev dışından dinlemek için sunucunun Tailscale adresini yaz.")
         OutlinedTextField(
             navidromeUrl, { navidromeUrl = it }, singleLine = true, modifier = field,
             label = { Text("Adres") }, placeholder = { Text("http://192.168.1.101:4533") },
@@ -1135,7 +1114,11 @@ private fun ConnectionSettings() {
             visualTransformation = PasswordVisualTransformation(),
         )
 
-        SectionTitle("Nota servisi (öneri ve indirme)")
+        InfoTitle(
+            "Nota servisi",
+            "Öneri, indirme ve radyoda şarkı tanıma bu servisle çalışır. Servis parolası: kurulumda YAML'da " +
+                "API_KEY olarak belirlediğin parola; başkalarının sunucuna şarkı indirmesini ya da silmesini engeller.",
+        )
         OutlinedTextField(
             serviceUrl, { serviceUrl = it }, singleLine = true, modifier = field,
             label = { Text("Adres") }, placeholder = { Text("http://192.168.1.101:8099") },
@@ -1144,33 +1127,23 @@ private fun ConnectionSettings() {
             serviceKey, { serviceKey = it }, singleLine = true, modifier = field, label = { Text("Servis parolası") },
             visualTransformation = PasswordVisualTransformation(),
         )
-        Text(
-            "Servis parolası: sunucuyu kurarken YAML'da API_KEY olarak belirlediğin parola. Başkalarının sunucuna şarkı indirmesini ya da silmesini engeller. Last.fm anahtarı da sunucuda tutulur; durumu aşağıda görünür.",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
 
-        SectionTitle("Last.fm hesabı")
+        InfoTitle(
+            "Last.fm",
+            "Navidrome'un dinlemeleri gönderdiği hesap. Geçmişin okunur (istatistikler, öneriler, unuttukların); parola gerekmez.",
+        )
         OutlinedTextField(
             lastfmUser, { lastfmUser = it }, singleLine = true, modifier = field,
             label = { Text("Last.fm kullanıcı adı") }, placeholder = { Text("Navidrome'un scrobble ettiği hesap") },
         )
-        Text(
-            "Dinleme geçmişin okunur: istatistikler, geçmişine göre öneriler ve unuttukların. Parola gerekmez.",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
 
-        SectionTitle("ListenBrainz hesabı (isteğe bağlı)")
+        InfoTitle(
+            "ListenBrainz (isteğe bağlı)",
+            "Haftalık keşif listen Sana özel önerilere karışır. Navidrome'a girdiğin anahtar gerekmez; kullanıcı adı yeterli.",
+        )
         OutlinedTextField(
             lbUser, { lbUser = it }, singleLine = true, modifier = field,
             label = { Text("ListenBrainz kullanıcı adı") }, placeholder = { Text("listenbrainz.org'daki adın") },
-        )
-        Text(
-            "Haftalık keşif listen Sana özel önerilere karışır. Navidrome'a girdiğin ListenBrainz anahtarı burada " +
-                "gerekmez; yalnızca kullanıcı adı yeterli.",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
 
         Button(
@@ -1188,15 +1161,9 @@ private fun ConnectionSettings() {
         SectionTitle("Bağlantı durumu")
         val list = statuses
         if (list == null) {
-            EmptyNote("Durumu görmek için \"Kaydet ve bağlantıları sına\" düğmesine dokun.")
+            EmptyNote("Durumu görmek için yukarıdaki düğmeye dokun.")
         } else {
             list.forEach { StatusRow(it) }
         }
-
-        Text(
-            "Ev dışında dinlemek için adreslerde sunucunun Tailscale adresini kullanın.",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(16.dp),
-        )
     }
 }

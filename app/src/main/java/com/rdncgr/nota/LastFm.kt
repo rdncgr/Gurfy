@@ -270,7 +270,7 @@ private fun StatsContent(st: LfmStats, period: String, nav: Nav) {
         if (st.tracks.isNotEmpty()) item {
             Row(Modifier.fillMaxWidth().padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) { SectionTitle("Şarkılar") }
-                if (librarySongs.isNotEmpty()) TextButton(onClick = { Graph.player.play(librarySongs, 0) }) {
+                if (librarySongs.isNotEmpty()) TextButton(onClick = { Graph.player.play(librarySongs, 0, ordered = true) }) {
                     Text("Hepsini çal")
                 }
             }
