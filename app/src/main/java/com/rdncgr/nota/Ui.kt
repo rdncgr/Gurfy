@@ -75,3 +75,17 @@ fun InfoTitle(title: String, info: String) {
         )
     }
 }
+
+/** Ayarlarda bir ayar grubunu ayrı bir kart içinde gösterir. */
+@Composable
+fun SettingsCard(content: @Composable () -> Unit) {
+    androidx.compose.material3.Card(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+    ) {
+        androidx.compose.foundation.layout.Column(Modifier.padding(bottom = 10.dp)) { content() }
+    }
+}

@@ -285,7 +285,6 @@ fun PlayModeIcon(mode: PlayMode, modifier: Modifier = Modifier) {
 fun HomeScreen(nav: Nav) {
     var refresh by remember { mutableIntStateOf(0) }
     var creating by remember { mutableStateOf(false) }
-    val p = Graph.player
     // Navidrome'a erişim: açılışta, yenilemede ve 30 sn'de bir denetlenir
     val serverOk by produceState<Boolean?>(null, refresh) {
         while (true) {
@@ -304,15 +303,6 @@ fun HomeScreen(nav: Nav) {
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Header("Nota", nav) {
-            // Tek düğme: her basışta Kapalı → Rastgele → Sana özel karışık (etkinse dolu arka plan)
-            val active = p.mode != PlayMode.OFF
-            if (active) FilledTonalIconButton(onClick = { p.cycleMode() }) {
-                if (p.preparing) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                else PlayModeIcon(p.mode)
-            } else IconButton(onClick = { p.cycleMode() }) {
-                if (p.preparing) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                else PlayModeIcon(p.mode)
-            }
             IconButton(onClick = { nav.push(Screen.Downloads) }) {
                 Icon(Icons.Filled.Smartphone, contentDescription = "Telefondakiler")
             }
@@ -326,13 +316,6 @@ fun HomeScreen(nav: Nav) {
                     tint = MaterialTheme.colorScheme.error,
                 ) else Icon(Icons.Filled.Refresh, contentDescription = "Yenile")
             }
-        }
-        // Mod etkinken altında kısa bir not: hangi modda olduğun anlaşılsın
-        if (p.mode != PlayMode.OFF) {
-            Text(
-                p.mode.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
         }
         HomeLayout.sections.filter { it.visible }.forEach { sec ->
             key(sec.key) { HomeSectionView(sec, nav, refresh) }

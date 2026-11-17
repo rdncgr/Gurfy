@@ -158,6 +158,36 @@ def auth(x_api_key: str = Header(default="")):
 
 # ---------------------------------------------------------------- yardımcılar
 
+
+# İngilizce indirme / bağlantı hatalarını kullanıcıya Türkçe anlatır (yt-dlp, ffmpeg, ağ)
+_TR_ERRORS = [
+    (r"private video", "Video gizli; indirilemiyor"),
+    (r"video unavailable|this video is no longer available|has been removed|account .* terminated", "Video YouTube'dan kaldırılmış ya da erişilemiyor"),
+    (r"not available in your country|blocked it in your country|geo.?restrict", "Video bu ülkede engelli"),
+    (r"confirm your age|age.?restricted|inappropriate for some users", "Yaş doğrulaması isteyen video indirilemiyor"),
+    (r"members.?only|join this channel", "Video yalnızca kanal üyelerine açık"),
+    (r"premieres in|live event will begin|is upcoming", "Video henüz yayınlanmamış"),
+    (r"requested format is not available|no video formats found|no formats", "Uygun ses biçimi bulunamadı"),
+    (r"http error 403|forbidden", "YouTube erişimi reddetti (403)"),
+    (r"http error 404", "Kaynak bulunamadı (404)"),
+    (r"http error 429|too many requests", "YouTube çok fazla istek nedeniyle geçici olarak engelledi (429)"),
+    (r"timed? ?out", "Bağlantı zaman aşımına uğradı"),
+    (r"name or service not known|temporary failure in name resolution|getaddrinfo failed", "İnternet bağlantısı yok (adres çözülemedi)"),
+    (r"connection (refused|reset|aborted)|unable to connect|failed to establish", "Bağlantı kurulamadı"),
+    (r"ffmpeg|ffprobe|postprocess", "Ses dosyası dönüştürülemedi (ffmpeg)"),
+    (r"no space left", "Sunucuda yer kalmadı"),
+    (r"permission denied", "Müzik klasörüne yazma izni yok"),
+    (r"no (entries|results)|did not match any|unable to extract", "YouTube'da bulunamadı"),
+]
+
+
+def tr_error(msg: str) -> str:
+    text = re.sub(r"\x1b\[[0-9;]*m", "", str(msg or "")).replace("ERROR: ", "").strip()
+    for pattern, tr in _TR_ERRORS:
+        if re.search(pattern, text, re.I):
+            return tr
+    return "Beklenmeyen hata: " + text[:160] if text else "Bilinmeyen hata"
+
 def norm(s: str) -> str:
     """Karşılaştırma için sadeleştir: küçük harf, aksansız, parantez/ek bilgi yok."""
     s = s or ""
@@ -589,8 +619,10 @@ def worker():
                 job["message"] = "YouTube engeli: 10 dk sonra tekrar denenecek"
                 requeue_later(job, 600)
             else:
-                if BOT_ERROR.search(msg):
-                    msg = "YouTube engeli (bot doğrulaması). PO token sağlayıcısının çalıştığını kontrol edin. " + msg
+                if BOT_ERROR.search(msg) and not re.search(r"http error 404", msg, re.I):
+                    msg = "YouTube engeli (bot doğrulaması). PO token sağlayıcısının çalıştığını kontrol edin."
+                else:
+                    msg = tr_error(msg)
                 job["status"], job["message"] = "error", msg[:300]
         save_jobs()
         if went_online:
@@ -713,7 +745,7 @@ def youtube_playlist(url: str) -> dict:
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(502, f"YouTube listesi açılamadı (liste gizli olabilir): {str(e)[:200]}")
+        raise HTTPException(502, f"YouTube listesi açılamadı (liste gizli olabilir): {tr_error(e)}")
     tracks = []
     for e in info.get("entries") or []:
         if not e or not e.get("id"):
@@ -968,7 +1000,7 @@ def preview(artist: str = "", title: str = "", url: Optional[str] = None, key: s
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(502, f"Önizleme açılamadı: {str(e)[:200]}")
+        raise HTTPException(502, f"Önizleme açılamadı: {tr_error(e)}")
     media = {".m4a": "audio/mp4", ".webm": "audio/webm", ".opus": "audio/ogg", ".mp3": "audio/mpeg"}
     return FileResponse(str(f), media_type=media.get(f.suffix, "application/octet-stream"))
 
@@ -1415,7 +1447,7 @@ def delete_song(req: DeleteReq):
     try:
         f.unlink()
     except OSError as e:
-        raise HTTPException(500, f"Dosya silinemedi: {e}")
+        raise HTTPException(500, f"Dosya silinemedi: {tr_error(e)}")
     # boş kalan albüm / sanatçı klasörlerini temizle
     folder = f.parent
     root = MUSIC_DIR.resolve()
@@ -1527,7 +1559,7 @@ def record_clip(url: str, seconds: int = 10) -> Path:
         raise HTTPException(504, "Yayından ses alınamadı (zaman aşımı)")
     except subprocess.CalledProcessError as e:
         out.unlink(missing_ok=True)
-        raise HTTPException(502, "Yayından ses alınamadı: " + (e.stderr or b"").decode("utf-8", "replace")[-200:])
+        raise HTTPException(502, "Yayından ses alınamadı: " + tr_error((e.stderr or b"").decode("utf-8", "replace")[-300:]))
     if not out.exists() or out.stat().st_size < 50_000:
         out.unlink(missing_ok=True)
         raise HTTPException(502, "Yayından yeterli ses alınamadı")
@@ -1582,7 +1614,7 @@ def recognize(req: RecognizeReq):
     try:
         hit = shazam(clip)
     except Exception as e:
-        raise HTTPException(502, f"Tanıma servisine ulaşılamadı: {str(e)[:200]}")
+        raise HTTPException(502, f"Tanıma servisine ulaşılamadı: {tr_error(e)}")
     finally:
         clip.unlink(missing_ok=True)
     if not hit:

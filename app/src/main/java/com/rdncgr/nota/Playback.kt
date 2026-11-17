@@ -267,7 +267,7 @@ class PlayerController(private val ctx: Context) {
                 val songs = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { source() }
                 if (songs.isEmpty()) Graph.toast("Kütüphanede şarkı yok") else play(songs, 0, ordered = true)
             } catch (e: Exception) {
-                Graph.toast(e.message ?: "Bağlantı kurulamadı")
+                Graph.toast(errorText(e, "Bağlantı kurulamadı"))
             } finally {
                 preparing = false
             }

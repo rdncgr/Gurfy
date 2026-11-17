@@ -137,7 +137,7 @@ private fun BackfillCard(onFinished: () -> Unit) {
                             status = try {
                                 withContext(Dispatchers.IO) { Graph.service.startGenreBackfill() }
                             } catch (e: Exception) {
-                                Graph.toast(e.message ?: "Başlatılamadı"); status
+                                Graph.toast(errorText(e, "Başlatılamadı")); status
                             }
                             starting = false
                         }

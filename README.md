@@ -98,7 +98,7 @@ ayarların ve indirdiklerin silinmez.
 
 ### 3. Uygulamayı bağla
 Uygulamada **Ayarlar > Bağlantılar**:
-- **Navidrome adresi:** `http://SUNUCU-ADRESİ:4533`. Ev dışından erişmek için Tailscale gibi bir VPN önerilir.
+- **Navidrome adresi:** `http://SUNUCU-ADRESİ:4533`. Ev dışından erişmek için ZeroTier ya da Tailscale gibi bir VPN ile sunucunun VPN adresini yaz.
 - **Kullanıcı adı / parola:** Navidrome hesabın
 - **Nota servis adresi:** `http://SUNUCU-ADRESİ:8099`
 - **Servis parolası:** YAML'da `API_KEY` olarak belirlediğin parola

@@ -410,7 +410,7 @@ private fun LinkImport(nav: Nav) {
                     state = try {
                         Load.Ok(withContext(Dispatchers.IO) { Graph.service.importList(link) })
                     } catch (e: Exception) {
-                        Load.Err(e.message ?: "Liste alınamadı")
+                        Load.Err(errorText(e, "Liste alınamadı"))
                     }
                 }
             },
@@ -826,10 +826,14 @@ fun SettingsScreen(nav: Nav) {
         }
         SwipePages(tab, settingsTabs.size, { tab = it }) { page ->
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                Spacer(Modifier.height(6.dp))
                 when (page) {
-                    0 -> HomeSettings()
-                    1 -> PlaybackSettings()
-                    2 -> OfflineSettings()
+                    0 -> SettingsCard { HomeSettings() }
+                    1 -> {
+                        SettingsCard { PlaybackSettings() }
+                        SettingsCard { HearingSettings() }
+                    }
+                    2 -> SettingsCard { OfflineSettings() }
                     else -> ConnectionSettings()
                 }
                 Spacer(Modifier.height(24.dp))
@@ -899,8 +903,6 @@ private fun PlaybackSettings() {
             }
         }
     }
-
-    HearingSettings()
 }
 
 @Composable
@@ -992,7 +994,7 @@ private fun checkAll(): List<Status> {
         Graph.subsonic.ping()
         out += Status("Navidrome", true, "Telefondan bağlanılıyor")
     } catch (e: Exception) {
-        out += Status("Navidrome", false, e.message ?: "Ulaşılamadı")
+        out += Status("Navidrome", false, errorText(e, "Ulaşılamadı"))
     }
     if (!Graph.settings.serviceConfigured) {
         out += Status("Nota servisi", null, "Adres girilmemiş")
@@ -1030,7 +1032,7 @@ private fun checkAll(): List<Status> {
                 val u = Graph.service.lastfm("user?user=" + java.net.URLEncoder.encode(lfmUser, "UTF-8"))
                 Status("Last.fm hesabı", true, "${u.optString("name")} · ${u.optInt("playcount")} dinleme")
             } catch (e: Exception) {
-                Status("Last.fm hesabı", false, e.message ?: "Kullanıcı bulunamadı")
+                Status("Last.fm hesabı", false, errorText(e, "Kullanıcı bulunamadı"))
             }
         }
         val lbUser = Graph.settings.listenbrainzUser
@@ -1043,7 +1045,7 @@ private fun checkAll(): List<Status> {
                     if (n > 0) "$lbUser · $n dinleme" else "$lbUser · henüz dinleme yok; öneriler birkaç hafta sonra gelir",
                 )
             } catch (e: Exception) {
-                Status("ListenBrainz hesabı", false, e.message ?: "Kullanıcı bulunamadı")
+                Status("ListenBrainz hesabı", false, errorText(e, "Kullanıcı bulunamadı"))
             }
         }
         out += Status(
@@ -1061,7 +1063,7 @@ private fun checkAll(): List<Status> {
             else "İsteğe bağlı: yalnızca bağlantıyla aktarılan 100'den uzun listeler için",
         )
     } catch (e: Exception) {
-        out += Status("Nota servisi", false, e.message ?: "Ulaşılamadı")
+        out += Status("Nota servisi", false, errorText(e, "Ulaşılamadı"))
     }
     return out
 }
@@ -1103,7 +1105,11 @@ private fun ConnectionSettings() {
     val field = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
 
     Column {
-        InfoTitle("Navidrome", "Müzik arşivinin sunucusu. Ev dışından dinlemek için sunucunun Tailscale adresini yaz.")
+        SettingsCard {
+        InfoTitle(
+            "Navidrome",
+            "Müzik arşivinin sunucusu. Ev dışından dinlemek için sunucunun VPN adresini yaz (ZeroTier, Tailscale…).",
+        )
         OutlinedTextField(
             navidromeUrl, { navidromeUrl = it }, singleLine = true, modifier = field,
             label = { Text("Adres") }, placeholder = { Text("http://192.168.1.101:4533") },
@@ -1113,7 +1119,9 @@ private fun ConnectionSettings() {
             pass, { pass = it }, singleLine = true, modifier = field, label = { Text("Parola") },
             visualTransformation = PasswordVisualTransformation(),
         )
+        }
 
+        SettingsCard {
         InfoTitle(
             "Nota servisi",
             "Öneri, indirme ve radyoda şarkı tanıma bu servisle çalışır. Servis parolası: kurulumda YAML'da " +
@@ -1127,7 +1135,9 @@ private fun ConnectionSettings() {
             serviceKey, { serviceKey = it }, singleLine = true, modifier = field, label = { Text("Servis parolası") },
             visualTransformation = PasswordVisualTransformation(),
         )
+        }
 
+        SettingsCard {
         InfoTitle(
             "Last.fm",
             "Navidrome'un dinlemeleri gönderdiği hesap. Geçmişin okunur (istatistikler, öneriler, unuttukların); parola gerekmez.",
@@ -1136,7 +1146,9 @@ private fun ConnectionSettings() {
             lastfmUser, { lastfmUser = it }, singleLine = true, modifier = field,
             label = { Text("Last.fm kullanıcı adı") }, placeholder = { Text("Navidrome'un scrobble ettiği hesap") },
         )
+        }
 
+        SettingsCard {
         InfoTitle(
             "ListenBrainz (isteğe bağlı)",
             "Haftalık keşif listen Sana özel önerilere karışır. Navidrome'a girdiğin anahtar gerekmez; kullanıcı adı yeterli.",
@@ -1145,6 +1157,7 @@ private fun ConnectionSettings() {
             lbUser, { lbUser = it }, singleLine = true, modifier = field,
             label = { Text("ListenBrainz kullanıcı adı") }, placeholder = { Text("listenbrainz.org'daki adın") },
         )
+        }
 
         Button(
             enabled = !checking,
@@ -1158,12 +1171,14 @@ private fun ConnectionSettings() {
             Text("Kaydet ve bağlantıları sına")
         }
 
-        SectionTitle("Bağlantı durumu")
-        val list = statuses
-        if (list == null) {
-            EmptyNote("Durumu görmek için yukarıdaki düğmeye dokun.")
-        } else {
-            list.forEach { StatusRow(it) }
+        SettingsCard {
+            SectionTitle("Bağlantı durumu")
+            val list = statuses
+            if (list == null) {
+                EmptyNote("Durumu görmek için yukarıdaki düğmeye dokun.")
+            } else {
+                list.forEach { StatusRow(it) }
+            }
         }
     }
 }

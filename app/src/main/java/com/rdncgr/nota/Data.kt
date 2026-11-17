@@ -305,7 +305,7 @@ class Subsonic(private val s: Settings, private val cacheDir: File) {
         }
         val r = JSONObject(body).getJSONObject("subsonic-response")
         if (r.optString("status") != "ok") {
-            throw IOException(r.optJSONObject("error")?.optString("message") ?: "Navidrome hatası")
+            throw IOException(navidromeError(r.optJSONObject("error")))
         }
         if (fromNetwork && cache != null) {
             try { cache.writeText(body) } catch (e: Exception) { }
@@ -813,7 +813,7 @@ object AutoOffline {
                     else -> "$done şarkı indirildi, $failed şarkı indirilemedi"
                 }
             } catch (e: Exception) {
-                status = "Eşitlenemedi: " + (e.message ?: "bağlantı yok")
+                status = "Eşitlenemedi: " + (errorText(e, "bağlantı yok"))
             } finally {
                 running = false
             }
@@ -856,7 +856,7 @@ object Favorites {
                 Graph.listsVersion++
             } catch (e: Exception) {
                 known[song.id] = !now // geri al
-                Graph.toast(e.message ?: "Beğeni kaydedilemedi")
+                Graph.toast(errorText(e, "Beğeni kaydedilemedi"))
             }
         }
     }
@@ -966,7 +966,7 @@ object Graph {
                 if (okMessage != null) info(okMessage)
                 then()
             } catch (e: Exception) {
-                toast(e.message ?: "Bir hata oluştu")
+                toast(errorText(e, "Bir hata oluştu"))
             }
         }
     }
@@ -978,8 +978,52 @@ object Graph {
             try {
                 offline.download(song)
             } catch (e: Exception) {
-                toast(e.message ?: "İndirilemedi")
+                toast(errorText(e, "İndirilemedi"))
             }
         }
     }
+}
+
+/** Ağ ve sunucu hatalarını Türkçe, anlaşılır bir cümleye çevirir. */
+fun errorText(e: Throwable, fallback: String): String {
+    var t: Throwable? = e
+    while (t != null) {
+        val m = t.message.orEmpty()
+        when {
+            t is java.net.UnknownHostException -> return "Sunucu adresi bulunamadı; adresi ve internet bağlantını kontrol et"
+            t is java.net.NoRouteToHostException -> return "Sunucuya ulaşılamıyor; ağ ya da VPN (ZeroTier, Tailscale) bağlantını kontrol et"
+            t is java.net.ConnectException || m.startsWith("Failed to connect") ->
+                return "Sunucuya bağlanılamadı; sunucu kapalı olabilir ya da adres yanlış"
+            t is java.net.SocketTimeoutException || m.equals("timeout", true) -> return "Sunucu zamanında cevap vermedi"
+            t is javax.net.ssl.SSLException -> return "Güvenli bağlantı kurulamadı (https ayarını kontrol et)"
+            t is java.net.SocketException -> return "Bağlantı koptu"
+            t is org.json.JSONException -> return "Sunucudan beklenmeyen bir cevap geldi; adres doğru mu?"
+            t is java.io.FileNotFoundException -> return "Dosya bulunamadı"
+        }
+        val code = Regex("""(?:hatası|başarısız|İndirilemedi): (\d{3})""").find(m)?.groupValues?.get(1)?.toInt()
+        if (code != null) return httpText(code)
+        t = t.cause
+    }
+    return e.message?.takeIf { it.isNotBlank() } ?: fallback
+}
+
+private fun httpText(code: Int) = when (code) {
+    400 -> "İstek hatalı (400)"
+    401, 403 -> "Erişim reddedildi; kullanıcı adı, parola ya da servis parolası yanlış ($code)"
+    404 -> "Sunucuda bulunamadı; adres doğru mu? (404)"
+    408, 504 -> "Sunucu zamanında cevap vermedi ($code)"
+    429 -> "Çok fazla istek; biraz sonra tekrar dene (429)"
+    in 500..599 -> "Sunucuda bir hata oluştu ($code)"
+    else -> "Sunucu hatası ($code)"
+}
+
+/** Navidrome'un İngilizce hata mesajları (Subsonic hata kodlarına göre). */
+fun navidromeError(err: org.json.JSONObject?): String = when (err?.optInt("code", -1)) {
+    10 -> "Navidrome: eksik bilgi gönderildi"
+    20, 30 -> "Navidrome sürümü uyumsuz"
+    40 -> "Navidrome: kullanıcı adı ya da parola yanlış"
+    41 -> "Navidrome: bu giriş yöntemi desteklenmiyor"
+    50 -> "Navidrome: bu işlem için yetkin yok"
+    70 -> "Navidrome'da bulunamadı"
+    else -> "Navidrome hatası" + (err?.optString("message")?.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: "")
 }

@@ -68,7 +68,7 @@ object SongId {
                     addHeard(r)
                 }
             } catch (e: Exception) {
-                result = Recognition(null, "", null, song.title, e.message ?: "Tanıma başarısız")
+                result = Recognition(null, "", null, song.title, errorText(e, "Tanıma başarısız"))
             } finally {
                 busy = false
                 listening = false

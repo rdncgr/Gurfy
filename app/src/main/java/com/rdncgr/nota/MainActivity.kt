@@ -102,7 +102,7 @@ fun <T> load(vararg keys: Any?, block: () -> T): State<Load<T>> =
         value = try {
             Load.Ok(withContext(Dispatchers.IO) { block() })
         } catch (e: Exception) {
-            Load.Err(e.message ?: "Bağlantı kurulamadı")
+            Load.Err(errorText(e, "Bağlantı kurulamadı"))
         }
     }
 
