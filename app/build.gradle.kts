@@ -7,11 +7,11 @@ plugins {
 val buildNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
 
 android {
-    namespace = "com.rdncgr.nota"
+    namespace = "com.rdncgr.gurfysync"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.rdncgr.nota"
+        applicationId = "com.rdncgr.gurfysync"
         minSdk = 26
         targetSdk = 35
         versionCode = buildNumber

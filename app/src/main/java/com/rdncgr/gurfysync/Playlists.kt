@@ -1,4 +1,4 @@
-package com.rdncgr.nota
+package com.rdncgr.gurfysync
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

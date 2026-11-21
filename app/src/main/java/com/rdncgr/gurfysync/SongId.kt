@@ -1,4 +1,4 @@
-package com.rdncgr.nota
+package com.rdncgr.gurfysync
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -51,7 +51,7 @@ object SongId {
     fun identify(song: Song, forceAudio: Boolean = false) {
         val url = song.streamUrl ?: return
         if (busy) return
-        if (!Graph.settings.serviceConfigured) { Graph.toast("Önce Ayarlar'dan Nota servis adresini girin"); return }
+        if (!Graph.settings.serviceConfigured) { Graph.toast("Önce Ayarlar'dan Gurfy servis adresini girin"); return }
         // "Sesten tanı" ile düzeltiliyorsa yayın bilgisinden gelen (hatalı) sonuç listeden çıkarılacak
         val wrong = result?.takeIf { forceAudio && resultFor == song.id && it.source == "metadata" }
         busy = true

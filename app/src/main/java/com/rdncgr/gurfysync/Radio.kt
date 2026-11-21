@@ -1,4 +1,4 @@
-package com.rdncgr.nota
+package com.rdncgr.gurfysync
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -154,7 +154,7 @@ fun RadioTab() {
         LazyColumn(Modifier.fillMaxSize()) {
             when {
                 !service && favorites.isEmpty() -> item {
-                    EmptyNote("Güncel radyo listeleri için Ayarlar > Bağlantılar'dan Nota servisini girin.")
+                    EmptyNote("Güncel radyo listeleri için Ayarlar > Bağlantılar'dan Gurfy servisini girin.")
                 }
                 state is Load.Loading && all.isEmpty() -> item { LoadBox(state) {} }
                 state is Load.Err && all.isEmpty() -> item { EmptyNote(state.message) }

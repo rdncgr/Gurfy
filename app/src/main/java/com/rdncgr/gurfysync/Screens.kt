@@ -1,4 +1,4 @@
-package com.rdncgr.nota
+package com.rdncgr.gurfysync
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -70,6 +70,8 @@ fun SongRow(song: Song, nav: Nav, onRemove: (() -> Unit)? = null, onClick: () ->
     if (confirmDelete) ServerDeleteDialog(song) { confirmDelete = false }
     var addToList by remember { mutableStateOf(false) }
     if (addToList) AddToPlaylistDialog(listOf(song)) { addToList = false }
+    var editGenre by remember { mutableStateOf(false) }
+    if (editGenre) GenreEditDialog(song) { editGenre = false }
     val offline = Graph.offline
     val saved = offline.downloaded.containsKey(song.id)
     val busy = offline.inProgress[song.id] == true
@@ -110,7 +112,15 @@ fun SongRow(song: Song, nav: Nav, onRemove: (() -> Unit)? = null, onClick: () ->
             IconButton(onClick = { menu = true }) {
                 Icon(Icons.Filled.MoreVert, contentDescription = "Seçenekler")
             }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            if (song.isLocal) DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(
+                    text = { Text("Benzerlerini bul") },
+                    onClick = {
+                        menu = false
+                        nav.push(Screen.Similar(song.artist, song.title))
+                    },
+                )
+            } else DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(
                     text = { Text(if (saved) "Telefondan sil" else "Telefona indir") },
                     onClick = {
@@ -130,6 +140,13 @@ fun SongRow(song: Song, nav: Nav, onRemove: (() -> Unit)? = null, onClick: () ->
                     onClick = {
                         menu = false
                         addToList = true
+                    },
+                )
+                if (Graph.settings.serviceConfigured) DropdownMenuItem(
+                    text = { Text("Türü düzenle") },
+                    onClick = {
+                        menu = false
+                        editGenre = true
                     },
                 )
                 DropdownMenuItem(
@@ -302,7 +319,7 @@ fun HomeScreen(nav: Nav) {
     }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Header("Nota", nav) {
+        Header("Gurfy Sync", nav) {
             IconButton(onClick = { nav.push(Screen.Downloads) }) {
                 Icon(Icons.Filled.Smartphone, contentDescription = "Telefondakiler")
             }
@@ -534,11 +551,6 @@ fun StarredScreen(nav: Nav) {
     SongListScreen("Beğeniler", nav, songs)
 }
 
-@Composable
-fun DownloadsScreen(nav: Nav) {
-    val songs = Graph.offline.downloaded.values.sortedBy { it.title.lowercase() }
-    SongListScreen("Telefondakiler", nav, Load.Ok(songs))
-}
 
 // ----------------------------------------------------------------------- arama
 

@@ -38,7 +38,7 @@ services:
       - bgutil-provider
 
   # YouTube "PO Token" sağlayıcısı: yt-dlp'nin bot engeline takılmaması için token üretir (hesap gerekmez).
-  # Yalnızca Nota servisi kullanır; dışarıya port açmaya gerek yok.
+  # Yalnızca Gurfy servisi kullanır; dışarıya port açmaya gerek yok.
   bgutil-provider:
     image: brainicism/bgutil-ytdlp-pot-provider:latest
     container_name: bgutil-provider
@@ -52,11 +52,11 @@ x-casaos:
   scheme: http
   index: /
   title:
-    custom: Nota Servis
+    custom: Gurfy Servis
   icon: https://raw.githubusercontent.com/rdncgr/Nota/main/docs/icon.png
   tagline:
-    en_us: Nota müzik uygulamasının sunucu servisi
-    custom: Nota müzik uygulamasının sunucu servisi
+    en_us: Gurfy Sync müzik uygulamasının sunucu servisi
+    custom: Gurfy Sync müzik uygulamasının sunucu servisi
   description:
-    en_us: Nota uygulaması için şarkı bulur, YouTube'dan indirip Navidrome arşivine ekler ve radyoda çalan şarkıyı tanır.
-    custom: Nota uygulaması için şarkı bulur, YouTube'dan indirip Navidrome arşivine ekler ve radyoda çalan şarkıyı tanır.
+    en_us: Gurfy Sync uygulaması için şarkı bulur, YouTube'dan indirip Navidrome arşivine ekler ve radyoda çalan şarkıyı tanır.
+    custom: Gurfy Sync uygulaması için şarkı bulur, YouTube'dan indirip Navidrome arşivine ekler ve radyoda çalan şarkıyı tanır.

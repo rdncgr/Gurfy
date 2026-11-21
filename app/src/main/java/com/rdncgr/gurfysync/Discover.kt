@@ -1,4 +1,4 @@
-package com.rdncgr.nota
+package com.rdncgr.gurfysync
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -246,7 +246,7 @@ fun DiscoverScreen(nav: Nav) {
             when {
                 page == 0 -> SearchContent(nav)
                 !service -> Column(Modifier.fillMaxSize()) {
-                    EmptyNote("Öneriler, popüler listeler ve indirme için önce Ayarlar > Bağlantılar'dan Nota servis adresini girin.")
+                    EmptyNote("Öneriler, popüler listeler ve indirme için önce Ayarlar > Bağlantılar'dan Gurfy servis adresini girin.")
                     Button(onClick = { nav.tab(Screen.SettingsScreen) }, modifier = Modifier.padding(horizontal = 24.dp)) {
                         Text("Ayarlara git")
                     }
@@ -516,11 +516,13 @@ fun NowPlayingScreen(nav: Nav) {
     var confirmDelete by remember { mutableStateOf(false) }
     if (addToList) AddToPlaylistDialog(listOf(song)) { addToList = false }
     if (confirmDelete) ServerDeleteDialog(song) { confirmDelete = false }
+    var editGenre by remember { mutableStateOf(false) }
+    if (editGenre) GenreEditDialog(song) { editGenre = false }
 
     // Üst kısım kayar; oynatma paneli ekranın altında sabit kalır (uzun isimler onu aşağı itmez)
     Column(Modifier.fillMaxSize()) {
         Header("Şimdi çalıyor", nav) {
-            if (!radio) Box {
+            if (!radio && !song.isLocal) Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Seçenekler") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(
@@ -532,6 +534,11 @@ fun NowPlayingScreen(nav: Nav) {
                         text = { Text("Telefondan sil") },
                         leadingIcon = { Icon(Icons.Filled.MobileOff, contentDescription = null) },
                         onClick = { menu = false; Graph.offline.delete(song.id) },
+                    )
+                    if (Graph.settings.serviceConfigured) DropdownMenuItem(
+                        text = { Text("Türü düzenle") },
+                        leadingIcon = { Icon(Icons.Filled.Category, contentDescription = null) },
+                        onClick = { menu = false; editGenre = true },
                     )
                     DropdownMenuItem(
                         text = { Text("Sunucudan sil") },
@@ -614,14 +621,14 @@ fun NowPlayingScreen(nav: Nav) {
                 IconButton(onClick = { nav.push(Screen.Similar(song.artist, song.title)) }) {
                     Icon(Icons.Filled.TravelExplore, contentDescription = "Benzerlerini bul")
                 }
-                IconButton(enabled = !saved, onClick = { Graph.saveOffline(song) }) {
+                if (!song.isLocal) IconButton(enabled = !saved, onClick = { Graph.saveOffline(song) }) {
                     Icon(
                         if (saved) Icons.Filled.DownloadDone else Icons.Filled.Download,
                         contentDescription = if (saved) "Telefonda" else "Telefona indir",
                         tint = if (saved) MaterialTheme.colorScheme.secondary else LocalContentColor.current,
                     )
                 }
-                IconButton(onClick = { Favorites.toggle(song) }) {
+                if (!song.isLocal) IconButton(onClick = { Favorites.toggle(song) }) {
                     Icon(
                         if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = if (liked) "Beğeniyi kaldır" else "Beğen",
@@ -752,7 +759,7 @@ fun OfflineSettings() {
     ) {
         auto = it
         s.autoOffline = it
-        if (it) AutoOffline.run(force = true)
+        if (it) AutoOffline.run(force = true) else AutoOffline.cancel()
     }
     if (auto) {
         Text(
@@ -760,10 +767,10 @@ fun OfflineSettings() {
             modifier = Modifier.padding(start = 16.dp, top = 4.dp),
         )
         Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            listOf(25, 50, 100, 200).forEach { n ->
+            listOf(10, 25, 50, 100, 200).forEach { n ->
                 FilterChip(
                     selected = count == n,
                     onClick = {
@@ -831,7 +838,7 @@ fun SettingsScreen(nav: Nav) {
                     0 -> SettingsCard { HomeSettings() }
                     1 -> {
                         SettingsCard { PlaybackSettings() }
-                        SettingsCard { HearingSettings() }
+                        SettingsCard { CrossfadeSettings() }
                     }
                     2 -> SettingsCard { OfflineSettings() }
                     else -> ConnectionSettings()
@@ -906,54 +913,24 @@ private fun PlaybackSettings() {
 }
 
 @Composable
-private fun HearingSettings() {
-    var mode by remember { mutableIntStateOf(HearingMode.setting()) }
-    var mono by remember { mutableStateOf(Graph.settings.hearingMono) }
-
+private fun CrossfadeSettings() {
+    var sec by remember { mutableIntStateOf(Graph.settings.crossfadeSec) }
     InfoTitle(
-        "İşitme cihazı modu",
-        "Bluetooth işitme cihazlarında kesilmeleri azaltır: ses tamponu büyür, şarkılar 48 kHz'de çalar, " +
-            "duraklatınca hat açık tutulur. Çal / duraklat yarım saniye geç tepki verir; değişiklik sonraki şarkıda geçerli olur.",
+        "Şarkılar arası geçiş",
+        "Şarkı biterken sıradaki şarkı başlar: biten şarkı yavaşça kısılır, yenisi yavaşça açılır. " +
+            "Radyoda ve \"aynı şarkıyı tekrarla\" açıkken devreye girmez.",
     )
-    // Durum satırı: bağlı cihaz ve modun şu an etkin olup olmadığı
-    val dev = HearingMode.device
-    val active = HearingMode.activeState
-    Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            Icons.Filled.Hearing, contentDescription = null, modifier = Modifier.size(18.dp),
-            tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            (if (dev != null) "Bağlı: $dev" else "Bağlı işitme cihazı yok") + " · " + (if (active) "mod etkin" else "mod kapalı"),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 8.dp),
-        )
-    }
-    val options = listOf(
-        Triple(HearingMode.OFF, "Kapalı", ""),
-        Triple(HearingMode.AUTO, "Otomatik", "İşitme cihazı bağlanınca açılır"),
-        Triple(HearingMode.ALWAYS, "Her zaman açık", "Cihaz tanınmasa da açık kalır"),
-    )
-    options.forEach { (value, title, desc) ->
-        Row(
-            Modifier.fillMaxWidth().clickable { mode = value; HearingMode.setMode(value) }.padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RadioButton(selected = mode == value, onClick = { mode = value; HearingMode.setMode(value) })
-            Column(Modifier.weight(1f).padding(start = 4.dp)) {
-                Text(title)
-                if (desc.isNotBlank()) Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-    SwitchRow(
-        "Mono ses",
-        "İki kulağa aynı ses; bir taraf koparsa şarkı eksik duyulmaz",
-        mono,
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        mono = it
-        HearingMode.setMono(it)
+        listOf(0, 3, 5, 8, 12).forEach { n ->
+            FilterChip(
+                selected = sec == n,
+                onClick = { sec = n; Graph.settings.crossfadeSec = n },
+                label = { Text(if (n == 0) "Kapalı" else "$n sn") },
+            )
+        }
     }
 }
 
@@ -997,14 +974,14 @@ private fun checkAll(): List<Status> {
         out += Status("Navidrome", false, errorText(e, "Ulaşılamadı"))
     }
     if (!Graph.settings.serviceConfigured) {
-        out += Status("Nota servisi", null, "Adres girilmemiş")
+        out += Status("Gurfy servisi", null, "Adres girilmemiş")
         out += Status("Last.fm", null, "Servis olmadan kontrol edilemez")
         return out
     }
     try {
         Graph.service.jobs() // servis parolasını da doğrular
         val h = Graph.service.health()
-        out += Status("Nota servisi", true, "yt-dlp " + h.optString("yt_dlp", "?"))
+        out += Status("Gurfy servisi", true, "yt-dlp " + h.optString("yt_dlp", "?"))
         if (h.has("po_token")) {
             out += Status(
                 "YouTube PO token", h.optBoolean("po_token"),
@@ -1063,7 +1040,7 @@ private fun checkAll(): List<Status> {
             else "İsteğe bağlı: yalnızca bağlantıyla aktarılan 100'den uzun listeler için",
         )
     } catch (e: Exception) {
-        out += Status("Nota servisi", false, errorText(e, "Ulaşılamadı"))
+        out += Status("Gurfy servisi", false, errorText(e, "Ulaşılamadı"))
     }
     return out
 }
@@ -1071,13 +1048,13 @@ private fun checkAll(): List<Status> {
 @Composable
 private fun ConnectionSettings() {
     val s = Graph.settings
-    var navidromeUrl by remember { mutableStateOf(s.navidromeUrl) }
-    var user by remember { mutableStateOf(s.user) }
-    var pass by remember { mutableStateOf(s.pass) }
-    var serviceUrl by remember { mutableStateOf(s.serviceUrl) }
-    var serviceKey by remember { mutableStateOf(s.serviceKey) }
-    var lastfmUser by remember { mutableStateOf(s.lastfmUser) }
-    var lbUser by remember { mutableStateOf(s.listenbrainzUser) }
+    var navidromeUrl by remember(SettingsBackup.restored) { mutableStateOf(s.navidromeUrl) }
+    var user by remember(SettingsBackup.restored) { mutableStateOf(s.user) }
+    var pass by remember(SettingsBackup.restored) { mutableStateOf(s.pass) }
+    var serviceUrl by remember(SettingsBackup.restored) { mutableStateOf(s.serviceUrl) }
+    var serviceKey by remember(SettingsBackup.restored) { mutableStateOf(s.serviceKey) }
+    var lastfmUser by remember(SettingsBackup.restored) { mutableStateOf(s.lastfmUser) }
+    var lbUser by remember(SettingsBackup.restored) { mutableStateOf(s.listenbrainzUser) }
     var statuses by remember { mutableStateOf<List<Status>?>(null) }
     var checking by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -1091,6 +1068,7 @@ private fun ConnectionSettings() {
         s.lastfmUser = lastfmUser
         s.listenbrainzUser = lbUser
         Graph.version++
+        SettingsBackup.tryRestore() // yeni kurulumda servis parolası girilince yedek gelir
     }
 
     fun check() {
@@ -1112,7 +1090,7 @@ private fun ConnectionSettings() {
         )
         OutlinedTextField(
             navidromeUrl, { navidromeUrl = it }, singleLine = true, modifier = field,
-            label = { Text("Adres") }, placeholder = { Text("http://192.168.1.101:4533") },
+            label = { Text("Adres") }, placeholder = { Text(DEFAULT_NAVIDROME_URL) },
         )
         OutlinedTextField(user, { user = it }, singleLine = true, modifier = field, label = { Text("Kullanıcı adı") })
         OutlinedTextField(
@@ -1123,13 +1101,13 @@ private fun ConnectionSettings() {
 
         SettingsCard {
         InfoTitle(
-            "Nota servisi",
+            "Gurfy servisi",
             "Öneri, indirme ve radyoda şarkı tanıma bu servisle çalışır. Servis parolası: kurulumda YAML'da " +
                 "API_KEY olarak belirlediğin parola; başkalarının sunucuna şarkı indirmesini ya da silmesini engeller.",
         )
         OutlinedTextField(
             serviceUrl, { serviceUrl = it }, singleLine = true, modifier = field,
-            label = { Text("Adres") }, placeholder = { Text("http://192.168.1.101:8099") },
+            label = { Text("Adres") }, placeholder = { Text(DEFAULT_SERVICE_URL) },
         )
         OutlinedTextField(
             serviceKey, { serviceKey = it }, singleLine = true, modifier = field, label = { Text("Servis parolası") },

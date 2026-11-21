@@ -1,4 +1,4 @@
-package com.rdncgr.nota
+package com.rdncgr.gurfysync
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -87,7 +87,7 @@ object LastFmApi {
 private fun NeedLastFm(nav: Nav) {
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         EmptyNote(
-            if (!Graph.settings.serviceConfigured) "Bunun için önce Ayarlar > Bağlantılar'dan Nota servisini girin."
+            if (!Graph.settings.serviceConfigured) "Bunun için önce Ayarlar > Bağlantılar'dan Gurfy servisini girin."
             else "Dinleme geçmişine göre öneri için Ayarlar > Bağlantılar'a Last.fm ya da ListenBrainz " +
                 "kullanıcı adını yazın (Navidrome'un dinlemeleri gönderdiği hesap).",
         )

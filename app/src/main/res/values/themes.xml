@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.Nota" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.GurfySync" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">#FF121417</item>
         <item name="android:statusBarColor">#FF121417</item>
         <item name="android:navigationBarColor">#FF121417</item>

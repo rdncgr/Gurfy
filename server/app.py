@@ -1,5 +1,5 @@
 """
-Nota müzik servisi
+Gurfy müzik servisi
 ------------------
 Telefon uygulaması ile ev sunucusu arasındaki küçük yardımcı servis.
 
@@ -148,7 +148,7 @@ def ytdlp_opts(**opts) -> dict:
 
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"}
 
-app = FastAPI(title="Nota müzik servisi")
+app = FastAPI(title="Gurfy müzik servisi")
 
 
 def auth(x_api_key: str = Header(default="")):
@@ -275,7 +275,7 @@ def as_list(x):
 # Benzer sanatçılarda Last.fm'e ikinci kaynak, kişisel haftalık keşif listesi.
 # Okuma için anahtar gerekmez; yalnızca kullanıcı adı. Sanatçılar MusicBrainz kimliğiyle (MBID) tanınır.
 
-LB_UA = {"User-Agent": "NotaServis/1.0 ( https://github.com/rdncgr/Nota )", "Accept": "application/json"}
+LB_UA = {"User-Agent": "GurfyServis/1.0 ( https://github.com/rdncgr/Nota )", "Accept": "application/json"}
 LB_SIMILAR_ALGO = "session_based_days_7500_session_300_contribution_5_threshold_10_limit_100_filter_True_skip_30"
 MBID_CACHE = Path(os.getenv("MBID_CACHE", "/app/mbid.json"))
 _mb_lock = threading.Lock()
@@ -817,7 +817,7 @@ def health():
 
 STATUS_PAGE = """<!doctype html>
 <html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Nota servisi</title>
+<title>Gurfy servisi</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 108 108'%3E%3Crect width='108' height='108' rx='24' fill='%23F2B84B'/%3E%3Cpath fill='%23121417' transform='translate(-8 4)' d='M48,34 L48,62 A9,9 0 1,0 54,70.5 L54,44 L70,40 L70,56 A9,9 0 1,0 76,64.5 L76,28 Z'/%3E%3C/svg%3E">
 <style>
 :root{--bg:#121417;--card:#1b1e23;--text:#f5f1e8;--muted:#9aa0a6;--amber:#f2b84b;--ok:#7bc47f;--bad:#e5735c;--off:#6b7078}
@@ -835,12 +835,12 @@ ol{margin:8px 0 0;padding-left:20px}li{margin:4px 0}
 footer{color:var(--muted);font-size:13px;text-align:center}footer a{color:var(--muted)}
 </style></head><body><main>
 <div class="brand"><div class="logo"><svg width="34" height="34" viewBox="22 22 64 64"><path fill="#121417" d="M48,34 L48,62 A9,9 0 1,0 54,70.5 L54,44 L70,40 L70,56 A9,9 0 1,0 76,64.5 L76,28 Z"/></svg></div>
-<div><h1>Nota servisi çalışıyor</h1></div></div>
-<p class="lead">Bu servis, Nota uygulaması için şarkı bulur, indirir ve radyoda çalan şarkıyı tanır. Bu sayfada yapman gereken bir şey yok; yalnızca uygulamayı bağlamak için aşağıdaki adresi kullan.</p>
+<div><h1>Gurfy servisi çalışıyor</h1></div></div>
+<p class="lead">Bu servis, Gurfy Sync uygulaması için şarkı bulur, indirir ve radyoda çalan şarkıyı tanır. Bu sayfada yapman gereken bir şey yok; yalnızca uygulamayı bağlamak için aşağıdaki adresi kullan.</p>
 <div class="card"><h2>Uygulamayı bağla</h2>
 <div class="addr" id="addr"></div>
-<ol><li>Telefonda Nota'yı aç, <b>Ayarlar &gt; Bağlantılar</b>'a git.</li>
-<li><b>Nota servisi &gt; Adres</b> kutusuna yukarıdaki adresi yaz.</li>
+<ol><li>Telefonda Gurfy Sync'i aç, <b>Ayarlar &gt; Bağlantılar</b>'a git.</li>
+<li><b>Gurfy servisi &gt; Adres</b> kutusuna yukarıdaki adresi yaz.</li>
 <li><b>Servis parolası</b> kutusuna kurulumda YAML'da <code>API_KEY</code> olarak belirlediğin parolayı yaz.</li>
 <li><b>Kaydet ve bağlantıları sına</b>'ya dokun.</li></ol></div>
 <div class="card"><h2>Durum</h2><div id="status"><div class="row"><div class="dot"></div><div><b>Kontrol ediliyor…</b></div></div></div></div>
@@ -1041,7 +1041,7 @@ def fetch_radio_browser(scope: str = "tr") -> List[dict]:
     for host in RADIO_HOSTS:
         try:
             r = requests.get(f"https://{host}.api.radio-browser.info{path}",
-                             headers={"User-Agent": "Nota/1.0"}, timeout=20)
+                             headers={"User-Agent": "Gurfy/1.0"}, timeout=20)
             r.raise_for_status()
             stations, seen = [], set()
             for s in r.json():
@@ -1435,14 +1435,82 @@ def music_file_for(nd_path: str) -> Optional[Path]:
     return None
 
 
-@app.post("/song/delete", dependencies=[Depends(auth)])
-def delete_song(req: DeleteReq):
-    song = navidrome_native(f"/api/song/{quote(req.id)}")
+def song_file(song_id: str) -> Path:
+    """Navidrome şarkı kimliğinden müzik klasöründeki dosyayı bulur."""
+    song = navidrome_native(f"/api/song/{quote(song_id)}")
     nd_path = song.get("path") or ""
     lib_path = song.get("libraryPath") or ""
     f = music_file_for(nd_path) or (music_file_for(lib_path.rstrip("/") + "/" + nd_path) if lib_path else None)
     if not f:
         raise HTTPException(404, f"Dosya müzik klasöründe bulunamadı: {nd_path}")
+    return f
+
+
+# ------------------------------------------------------- uygulama ayarlarının yedeği
+# Telefon ayarlarını buraya yedekler; uygulama silinip yeniden kurulunca servis parolası
+# girilince ayarlar geri gelir. Dosya yalnızca bu servisin klasöründe durur.
+
+SETTINGS_FILE = Path(os.getenv("SETTINGS_FILE", "/app/uygulama-ayarlari.json"))
+
+
+class SettingsReq(BaseModel):
+    data: dict
+
+
+@app.get("/settings", dependencies=[Depends(auth)])
+def get_settings():
+    try:
+        return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"data": None}
+
+
+@app.post("/settings", dependencies=[Depends(auth)])
+def save_settings(req: SettingsReq):
+    body = {"data": req.data, "saved": time.time()}
+    tmp = SETTINGS_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(SETTINGS_FILE)
+    return {"saved": body["saved"]}
+
+
+class GenreReq(BaseModel):
+    id: str
+    genres: List[str] = []
+
+
+@app.post("/song/genre", dependencies=[Depends(auth)])
+def set_song_genre(req: GenreReq):
+    """Şarkının tür etiketini elle değiştirir (boş liste türü siler), sonra Navidrome'u taratır."""
+    from mutagen import File as AudioFile
+    genres = []
+    for g in req.genres:
+        g = " ".join(g.split())[:60]
+        if g and g.lower() not in [x.lower() for x in genres]:
+            genres.append(g)
+    f = song_file(req.id)
+    try:
+        audio = AudioFile(str(f), easy=True)
+        if audio is None:
+            raise HTTPException(415, "Bu dosya türüne etiket yazılamıyor")
+        if audio.tags is None:
+            audio.add_tags()
+        if genres:
+            audio["genre"] = genres
+        elif "genre" in audio:
+            del audio["genre"]
+        audio.save()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Tür yazılamadı: {tr_error(e)}")
+    start_scan()
+    return {"genres": genres, "file": str(f.relative_to(MUSIC_DIR.resolve()))}
+
+
+@app.post("/song/delete", dependencies=[Depends(auth)])
+def delete_song(req: DeleteReq):
+    f = song_file(req.id)
     rel = str(f.relative_to(MUSIC_DIR.resolve()))
     try:
         f.unlink()

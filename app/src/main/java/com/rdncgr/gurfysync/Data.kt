@@ -1,4 +1,4 @@
-package com.rdncgr.nota
+package com.rdncgr.gurfysync
 
 import android.content.Context
 import android.net.ConnectivityManager
@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -27,6 +28,10 @@ import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 // ------------------------------------------------------------------ modeller
+
+/** Ev sunucusunun adresleri: ilk açılışta ayarlarda hazır gelir, elle değiştirilebilir. */
+const val DEFAULT_NAVIDROME_URL = "http://10.243.0.1:4533"
+const val DEFAULT_SERVICE_URL = "http://10.243.0.1:8099"
 
 data class Song(
     val id: String,
@@ -45,8 +50,11 @@ data class Song(
     val logo: String? = null,
     /** Tür (dosyadaki etiketten, Navidrome okur). */
     val genre: String? = null,
+    /** Telefonun kendi müzik kütüphanesindeki dosya (content:// adresi). */
+    val localUri: String? = null,
 ) {
     val isRadio: Boolean get() = streamUrl != null
+    val isLocal: Boolean get() = localUri != null
 }
 
 /** İnternet radyosu. id: Navidrome'daki kaydın kimliği (sunucu listesindekilerde null). */
@@ -96,10 +104,18 @@ data class ImportedList(val name: String, val tracks: List<Suggestion>)
 // ------------------------------------------------------------------- ayarlar
 
 class Settings(ctx: Context) {
-    private val prefs = ctx.getSharedPreferences("nota", Context.MODE_PRIVATE)
+    val prefs: android.content.SharedPreferences = ctx.getSharedPreferences("gurfysync", Context.MODE_PRIVATE)
+
+    fun export(keys: Set<String>): JSONObject = prefs.exportJson(keys)
+    fun import(data: JSONObject, keys: Set<String>) = prefs.importJson(data, keys)
+
+    /** Bu kurulumda sunucudaki ayar yedeğine bakıldı mı (bakılmadan yedek gönderilmez). */
+    var backupChecked: Boolean
+        get() = prefs.getBoolean("backupChecked", false)
+        set(v) = prefs.edit().putBoolean("backupChecked", v).apply()
 
     var navidromeUrl: String
-        get() = prefs.getString("navidromeUrl", "") ?: ""
+        get() = prefs.getString("navidromeUrl", DEFAULT_NAVIDROME_URL) ?: ""
         set(v) = prefs.edit().putString("navidromeUrl", v.trim().trimEnd('/')).apply()
     var user: String
         get() = prefs.getString("user", "") ?: ""
@@ -108,7 +124,7 @@ class Settings(ctx: Context) {
         get() = prefs.getString("pass", "") ?: ""
         set(v) = prefs.edit().putString("pass", v).apply()
     var serviceUrl: String
-        get() = prefs.getString("serviceUrl", "") ?: ""
+        get() = prefs.getString("serviceUrl", DEFAULT_SERVICE_URL) ?: ""
         set(v) = prefs.edit().putString("serviceUrl", v.trim().trimEnd('/')).apply()
     var serviceKey: String
         get() = prefs.getString("serviceKey", "") ?: ""
@@ -171,14 +187,10 @@ class Settings(ctx: Context) {
         get() = prefs.getInt("repeatMode", 0)
         set(v) = prefs.edit().putInt("repeatMode", v).apply()
 
-    /** İşitme cihazı uyumluluk modu: 0 kapalı, 1 otomatik (cihaz bağlanınca), 2 her zaman. */
-    var hearingMode: Int
-        get() = prefs.getInt("hearingMode", 1)
-        set(v) = prefs.edit().putInt("hearingMode", v).apply()
-
-    var hearingMono: Boolean
-        get() = prefs.getBoolean("hearingMono", false)
-        set(v) = prefs.edit().putBoolean("hearingMono", v).apply()
+    /** Şarkılar arası geçiş (crossfade) süresi, saniye; 0 kapalı. */
+    var crossfadeSec: Int
+        get() = prefs.getInt("crossfadeSec", 0)
+        set(v) = prefs.edit().putInt("crossfadeSec", v).apply()
 
     /** Şarkı başına son çalış sonuçları (atlandı/dinlendi), JSON nesne. */
     var skipsJson: String
@@ -354,10 +366,28 @@ class Subsonic(private val s: Settings, private val cacheDir: File) {
         return SearchResult(r.list("artist").map(::artistOf), r.list("album").map(::albumOf), r.list("song").map(::songOf))
     }
 
-    fun playlists(): List<Playlist> =
-        call("getPlaylists").optJSONObject("playlists")?.list("playlist")?.map {
+    fun playlists(): List<Playlist> {
+        val list = call("getPlaylists").optJSONObject("playlists")?.list("playlist")?.map {
             Playlist(it.optString("id"), it.optString("name", "?"), it.optInt("songCount", 0), it.strOrNull("coverArt"))
         } ?: emptyList()
+        // Kapak: Navidrome'un karma görseli yerine listeye ilk eklenen şarkının kapağı
+        return list.map { p -> if (p.songCount == 0) p else p.copy(coverArt = firstCover(p) ?: p.coverArt) }
+    }
+
+    /** Liste kimliği + şarkı sayısı → ilk şarkının kapağı ("" = yok). Liste değişince yeniden bakılır. */
+    private val firstCovers = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    private fun firstCover(p: Playlist): String? {
+        val key = p.id + "|" + p.songCount
+        firstCovers[key]?.let { return it.ifEmpty { null } }
+        val cover = try {
+            call("getPlaylist", "id" to p.id).optJSONObject("playlist")?.list("entry")?.firstOrNull()?.strOrNull("coverArt")
+        } catch (e: Exception) {
+            return null
+        }
+        firstCovers[key] = cover ?: ""
+        return cover
+    }
 
     fun playlistSongs(id: String): List<Song> =
         call("getPlaylist", "id" to id).optJSONObject("playlist")?.list("entry")?.map(::songOf) ?: emptyList()
@@ -552,7 +582,8 @@ class Subsonic(private val s: Settings, private val cacheDir: File) {
     fun streamUrl(id: String): String = url("stream", "id" to id)
 
     fun coverUrl(coverArt: String?, size: Int = 300): String? =
-        if (coverArt.isNullOrBlank() || !s.configured) null else url("getCoverArt", "id" to coverArt, "size" to size.toString())
+        if (coverArt?.startsWith("content://") == true) coverArt // telefondaki şarkının albüm kapağı
+        else if (coverArt.isNullOrBlank() || !s.configured) null else url("getCoverArt", "id" to coverArt, "size" to size.toString())
 }
 
 // ------------------------------------------------- Nota servisi (öneri/indirme)
@@ -565,12 +596,16 @@ class ServiceApi(private val s: Settings) {
     private val jsonType = "application/json; charset=utf-8".toMediaType()
 
     private fun exec(req: Request.Builder): JSONObject {
-        if (!s.serviceConfigured) throw IOException("Önce Ayarlar'dan Nota servis adresini girin")
+        if (!s.serviceConfigured) throw IOException("Önce Ayarlar'dan Gurfy servis adresini girin")
         req.header("X-API-Key", s.serviceKey)
         http.newCall(req.build()).execute().use { resp ->
             val body = resp.body?.string() ?: ""
             if (!resp.isSuccessful) {
                 val detail = try { JSONObject(body).optString("detail") } catch (e: Exception) { "" }
+                // FastAPI'nin kendi "Not Found" cevabı: bu özellik sunucudaki eski app.py'de yok
+                if (resp.code == 404 && detail == "Not Found") {
+                    throw IOException("Sunucudaki servis bu özelliği bilmiyor; güncel app.py'yi yükleyip servisi yeniden başlat")
+                }
                 throw IOException(detail.ifBlank { "Servis hatası: ${resp.code}" })
             }
             return JSONObject(body)
@@ -623,6 +658,15 @@ class ServiceApi(private val s: Settings) {
 
     /** Şarkının dosyasını sunucudaki müzik klasöründen siler (Navidrome taraması da başlar). */
     fun deleteSong(id: String) { post("/song/delete", JSONObject().put("id", id)) }
+
+    /** Ayar yedeği; sunucuda yedek yoksa null. */
+    fun loadSettings(): JSONObject? = get("/settings").optJSONObject("data")
+
+    fun saveSettings(data: JSONObject) { post("/settings", JSONObject().put("data", data)) }
+
+    fun setGenres(id: String, genres: List<String>) {
+        post("/song/genre", JSONObject().put("id", id).put("genres", org.json.JSONArray(genres)))
+    }
 
     /** İndirme listesinden siler; ids boşsa bitmiş/hatalı kayıtların hepsi. */
     fun deleteJobs(ids: List<String> = emptyList()) {
@@ -768,6 +812,16 @@ object AutoOffline {
         private set
 
     private const val INTERVAL_MS = 6 * 60 * 60 * 1000L // en fazla 6 saatte bir kendiliğinden
+    private var job: kotlinx.coroutines.Job? = null
+
+    /** Kullanıcı otomatik indirmeyi kapattı: süren eşitlemeyi durdur (inen şarkı biter, sonrakiler inmez). */
+    fun cancel() {
+        val j = job ?: return
+        if (j.isActive) {
+            j.cancel()
+            status = "Otomatik indirme durduruldu"
+        }
+    }
 
     private fun onUnmeteredNetwork(ctx: Context): Boolean {
         val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -786,7 +840,7 @@ object AutoOffline {
         }
         running = true
         status = "Sık dinlenenler bulunuyor…"
-        Graph.scope.launch {
+        job = Graph.scope.launch {
             try {
                 // Elle silinenler atlanır; yerlerini sıradaki sık dinlenenler doldurur
                 val excluded = s.offlineExcluded
@@ -797,10 +851,13 @@ object AutoOffline {
                 var done = 0
                 var failed = 0
                 missing.forEachIndexed { i, song ->
+                    ensureActive() // kapatıldıysa sıradakine geçme
                     status = "İndiriliyor ${i + 1}/${missing.size}: ${song.title}"
                     try {
                         Graph.offline.download(song)
                         done++
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         failed++
                     }
@@ -812,10 +869,13 @@ object AutoOffline {
                     failed == 0 -> "$done yeni şarkı telefona indirildi"
                     else -> "$done şarkı indirildi, $failed şarkı indirilemedi"
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                status = "Otomatik indirme durduruldu"
             } catch (e: Exception) {
                 status = "Eşitlenemedi: " + (errorText(e, "bağlantı yok"))
             } finally {
                 running = false
+                job = null
             }
         }
     }
@@ -944,7 +1004,7 @@ object Graph {
         player = PlayerController(appContext)
         HomeLayout.load()
         ready = true
-        HearingMode.start(appContext)
+        SettingsBackup.start(settings.prefs)
         Jobs.start()
     }
 

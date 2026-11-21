@@ -1,4 +1,4 @@
-package com.rdncgr.nota
+package com.rdncgr.gurfysync
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Row

@@ -1,4 +1,4 @@
-package com.rdncgr.nota
+package com.rdncgr.gurfysync
 
 import android.app.PendingIntent
 import android.content.ComponentName
@@ -45,12 +45,12 @@ object LiveMeta {
 /** Arka planda çalmayı ve bildirim/kilit ekranı kontrollerini sağlayan servis. */
 class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
+    private var crossfader: Crossfader? = null
 
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
         Graph.init(this) // sistem servisi uygulamadan önce başlatırsa diye
-        HearingMode.start(this)
         val attrs = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -62,7 +62,7 @@ class PlaybackService : MediaSessionService() {
             .build()
         val sources = DefaultMediaSourceFactory(this)
             .setLoadErrorHandlingPolicy(DefaultLoadErrorHandlingPolicy(6))
-        val player = ExoPlayer.Builder(this, HearingRenderersFactory(this))
+        val player = ExoPlayer.Builder(this)
             .setLoadControl(loadControl)
             .setMediaSourceFactory(sources)
             .setAudioAttributes(attrs, true)
@@ -81,19 +81,8 @@ class PlaybackService : MediaSessionService() {
                 }
             }
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) { LiveMeta.update(null) }
-
-            // İşitme cihazı modu: çalmıyorken (duraklatma, ara belleğe alma) hattı sessizlikle açık tut
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (isPlaying) KeepAlive.stop()
-                else if (player.mediaItemCount > 0 && player.playbackState != Player.STATE_ENDED &&
-                    player.playbackState != Player.STATE_IDLE
-                ) KeepAlive.start()
-            }
-
-            override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_ENDED || state == Player.STATE_IDLE) KeepAlive.stop()
-            }
         })
+        crossfader = Crossfader(this, player).also { it.start() }
         session = MediaSession.Builder(this, player)
             .setSessionActivity(open)
             .setCallback(object : MediaSession.Callback {
@@ -120,7 +109,8 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
-        KeepAlive.stop()
+        crossfader?.release()
+        crossfader = null
         session?.let {
             it.player.release()
             it.release()
@@ -180,7 +170,7 @@ object Preview {
     fun toggle(s: Suggestion) {
         val key = keyOf(s)
         if (currentKey == key) { stop(); return }
-        if (!Graph.settings.serviceConfigured) { Graph.toast("Önce Nota servis adresini girin"); return }
+        if (!Graph.settings.serviceConfigured) { Graph.toast("Önce Gurfy servis adresini girin"); return }
         Graph.player.pause()
         val p = ensure(Graph.appContext)
         currentKey = key
@@ -363,6 +353,7 @@ class PlayerController(private val ctx: Context) {
         val local = Graph.offline.fileFor(song.id)
         val uri = when {
             song.streamUrl != null -> Uri.parse(song.streamUrl) // radyo: doğrudan akış
+            song.localUri != null -> Uri.parse(song.localUri) // telefonun kendi müziği
             Graph.offline.downloaded.containsKey(song.id) && local.exists() -> Uri.fromFile(local)
             else -> Uri.parse(Graph.subsonic.streamUrl(song.id))
         }
@@ -494,7 +485,7 @@ object Scrobbler {
         val now = android.os.SystemClock.elapsedRealtime()
         val delta = (now - lastTick).coerceIn(0L, 2_000L)
         lastTick = now
-        if (song == null || song.isRadio) { id = null; return }
+        if (song == null || song.isRadio || song.isLocal) { id = null; return }
         if (song.id != id) {
             id = song.id
             startedAt = System.currentTimeMillis()
