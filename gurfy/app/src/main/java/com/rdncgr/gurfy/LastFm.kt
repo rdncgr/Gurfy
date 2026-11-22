@@ -12,6 +12,7 @@ import java.io.IOException
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * Last.fm ve ListenBrainz: Gurfy servisindeki (server/app.py) karşılıklarının telefondaki hali.
@@ -34,7 +35,12 @@ object Lfm {
     private val user get() = Graph.settings.lastfmUser
 
     private const val API = "https://ws.audioscrobbler.com/2.0/"
+    /** Tek istek yapan işler (alt iş açmaz). */
     private val pool = Executors.newFixedThreadPool(6)
+    /** Kendi içinde `pool`'a iş atıp bekleyen işler. Aynı havuzda olsalar havuz dolunca birbirini bekleyip kilitlenir. */
+    private val outer = Executors.newFixedThreadPool(6)
+    /** ListenBrainz benzerleri: MusicBrainz saniyede bir istek istediği için yavaş; Last.fm isteklerini bekletmesin. */
+    private val lbPool = Executors.newFixedThreadPool(2)
 
     // ----------------------------------------------------------------- önbellek
 
@@ -135,7 +141,7 @@ object Lfm {
     }
 
     private fun <A, B> parallel(items: List<A>, fn: (A) -> B): List<B> =
-        items.map { pool.submit(Callable { fn(it) }) }.map { it.get() }
+        items.map { outer.submit(Callable { fn(it) }) }.map { it.get() }
 
     private fun requireUser(u: String): String = u.ifBlank { throw IOException("Last.fm kullanıcı adı girilmemiş") }
 
@@ -300,8 +306,10 @@ object Lfm {
     /** Last.fm ve ListenBrainz birleşik: ikisinin de benzer dediği sanatçılar öne çıkar. */
     fun similarArtists(name: String, limit: Int = 12): List<Pair<String, Double>> {
         val fl = pool.submit(Callable { lfmSimilarArtists(name, 25) })
-        val fb = pool.submit(Callable { try { lbSimilarArtists(name) } catch (e: Exception) { emptyList() } })
-        val lists = listOf(fl.get(), fb.get())
+        val fb = lbPool.submit(Callable { try { lbSimilarArtists(name) } catch (e: Exception) { emptyList() } })
+        // ListenBrainz yetişmezse yalnızca Last.fm; iş sürer ve sonucu bir sonraki sefer için önbelleğe girer
+        val lb = try { fb.get(8, TimeUnit.SECONDS) } catch (e: Exception) { emptyList() }
+        val lists = listOf(fl.get(), lb)
         val weights = listOf(1.0, 0.6)
         val score = LinkedHashMap<String, Double>()
         val label = HashMap<String, String>()
