@@ -111,6 +111,12 @@ object ListenBubble {
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 }
 
+private tailrec fun Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
 /** WAV (PCM 16 bit, tek kanal) üretir. */
 object Wav {
     fun encode(pcm: ShortArray, rate: Int): ByteArray {
@@ -143,7 +149,8 @@ fun ListenBubbleButton() {
     val perms = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         if (ListenBubble.micAllowed(ctx)) {
             ListenBubble.start(ctx)
-            Graph.toast("Şarkı bulma topu açıldı. Başka bir uygulamaya geçince görünür; müzik çalarken ona dokun.")
+            // Uygulama arka plana geçer, top hemen görünür (top uygulamanın kendi ekranında gizli)
+            ctx.findActivity()?.moveTaskToBack(true)
         } else {
             Graph.toast("Mikrofon izni olmadan top sesi dinleyemez")
         }
@@ -428,7 +435,12 @@ class ListenService : Service() {
                 MotionEvent.ACTION_DOWN -> { downX = e.rawX; downY = e.rawY; startX = p.x; startY = p.y; moved = false }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = e.rawX - downX; val dy = e.rawY - downY
-                    if (!moved && (dx * dx + dy * dy) > slop * slop) { moved = true; showTrash() }
+                    if (!moved && (dx * dx + dy * dy) > slop * slop) {
+                        moved = true
+                        // Alttaki sonuç/hata kartı X'in üstünü örter; sürüklerken kaldırılır
+                        if (job?.isActive != true) removeCard()
+                        showTrash()
+                    }
                     if (moved) {
                         p.x = (startX + dx).toInt().coerceIn(0, dm.widthPixels - size)
                         p.y = (startY + dy).toInt().coerceIn(0, dm.heightPixels - size)
@@ -498,6 +510,7 @@ class ListenService : Service() {
     private fun showTrash() {
         val box = trashBox ?: return
         highlightTrash(false)
+        card?.visibility = View.INVISIBLE // dinleme sürerken kart kalır ama X'i örtmez
         box.alpha = 0f
         box.visibility = View.VISIBLE
         box.animate().alpha(1f).setDuration(150).start()
@@ -506,6 +519,7 @@ class ListenService : Service() {
     private fun hideTrash() {
         trashBox?.visibility = View.GONE
         highlightTrash(false)
+        card?.visibility = View.VISIBLE
     }
 
     private fun removeTrash() {
