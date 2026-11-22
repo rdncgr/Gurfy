@@ -80,7 +80,7 @@ Last.fm önerileri için Gurfy servisi gerekir.
 ## Kurulum
 
 ### 1. Uygulamayı yükle
-[Releases](../../releases) bölümündeki en yeni `gurfy-sync-N.apk` dosyasını telefonuna indirip aç.
+[Releases](../../releases) bölümündeki en yeni `gurfy-sync-X.Y.apk` dosyasını telefonuna indirip aç.
 Telefon "bilinmeyen kaynak" izni isterse ver. Yeni sürümler eskisinin üzerine kurulur;
 ayarların ve indirdiklerin silinmez.
 
@@ -126,6 +126,13 @@ Türü dolu olanlara dokunmaz. Tek bir şarkının türünü eklemek ya da deği
 Hayır. Telefondan silinen şarkı otomatik indirmeye bir daha alınmaz. Şarkıyı sunucudan da silmek
 istersen şarkının menüsünde **Sunucudan sil** seçeneği var.
 
+**YouTube bir şeyi değiştirirse nasıl haberim olur?**
+Servis 6 saatte bir kendini sınar: YouTube'da bir şarkı arar ve ses akışını çözer, Shazam'ın (şarkı tanıma)
+yanıt verip vermediğine bakar, yt-dlp'nin ve Gurfy'nin kullandığı NewPipeExtractor'ın yeni sürümü çıkmış mı bakar.
+Sonuç servis sayfasında ("YouTube denetimi", "Shazam denetimi") görünür; `http://SUNUCU-ADRESİ:8099/youtube/status` son 30 denetimin geçmişini verir. Aralık YAML'da
+`YOUTUBE_WATCH_HOURS` ile değişir. yt-dlp güncellemesi için konteyneri yeniden başlatmak yeter.
+Uygulamalar da açılışta GitHub'daki yeni sürüme bakar ve varsa indirme bağlantısını sunar.
+
 **Gizli Spotify / YouTube listelerimi aktarabilir miyim?**
 Hayır, yalnızca herkese açık listeler okunabilir. Spotify listelerinin ilk ~100 şarkısı anahtarsız gelir.
 Daha uzun listeler için YAML'a `SPOTIFY_CLIENT_ID` ve `SPOTIFY_CLIENT_SECRET` ekleyebilirsin.
@@ -141,3 +148,7 @@ Daha uzun listeler için YAML'a `SPOTIFY_CLIENT_ID` ve `SPOTIFY_CLIENT_SECRET` e
 - İmza anahtarı depoda tutulmaz. Kendi kopyanda Settings > Secrets and variables > Actions altına
   `KEYSTORE_BASE64` adıyla anahtar dosyasının base64 halini ekle (`base64 -w0 debug.keystore`).
   Aynı anahtarla imzalanmayan APK eskisinin üzerine kurulmaz.
+
+## Lisans
+
+[GPL-3.0](LICENSE). Gurfy, GPL-3.0 lisanslı NewPipeExtractor'ı kullandığı için depo da bu lisansla açıktır.

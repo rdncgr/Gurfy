@@ -46,20 +46,35 @@ jobs:
             echo "::error::KEYSTORE_BASE64 geçerli bir imza anahtarı değil"; exit 1
           fi
 
+      # Sürüm app/surum.txt dosyasından. Bu sürüm daha önce yayınlandıysa yalnızca derlenir, yeni sürüm çıkmaz.
+      - name: Sürümü oku
+        id: v
+        run: |
+          V=$(tr -d '[:space:]' < app/surum.txt)
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/gurfy-sync-v$V" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Gurfy Sync $V zaten yayınlanmış. Yeni sürüm için app/surum.txt artırılmalı."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: APK derle
         run: gradle :app:assembleDebug --no-daemon --stacktrace
 
       - name: APK adını düzenle
-        run: cp app/build/outputs/apk/debug/app-debug.apk gurfy-sync-${{ github.run_number }}.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk gurfy-sync-${{ steps.v.outputs.version }}.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: gurfy-sync-apk
-          path: gurfy-sync-${{ github.run_number }}.apk
+          path: gurfy-sync-${{ steps.v.outputs.version }}.apk
 
+      # Uygulamalar güncellemeyi "gurfy-sync-v" etiketlerinden bulur (shared/.../Updates.kt)
       - name: Sürüm olarak yayınla
+        if: steps.v.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: surum-${{ github.run_number }}
-          name: Gurfy Sync ${{ github.run_number }}
-          files: gurfy-sync-${{ github.run_number }}.apk
+          tag_name: gurfy-sync-v${{ steps.v.outputs.version }}
+          name: Gurfy Sync ${{ steps.v.outputs.version }}
+          files: gurfy-sync-${{ steps.v.outputs.version }}.apk

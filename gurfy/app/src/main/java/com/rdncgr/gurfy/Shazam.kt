@@ -230,6 +230,12 @@ private object Fft {
 /** Tanınan şarkı. */
 data class Recognized(val artist: String, val title: String, val album: String?, val cover: String?)
 
+/**
+ * Shazam'ın yanıtı beklenmedik: adres, başlıklar ya da JSON biçimi değişmiş olabilir.
+ * Ağ hatasından (internet yok) ayrı tutulur; kullanıcıya "servis değişmiş olabilir" denir.
+ */
+class ShazamChanged(message: String) : java.io.IOException(message)
+
 /** İmzayı Shazam'a sorar (shazamio'nun kullandığı adres ve başlıklar). */
 object ShazamApi {
     private const val UA = "Dalvik/2.1.0 (Linux; U; Android 5.0.2; VS980 4G Build/LRX22G)"
@@ -255,14 +261,17 @@ object ShazamApi {
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
         val text = http.newCall(req).execute().use { r ->
-            if (!r.isSuccessful) throw java.io.IOException("Shazam HTTP ${r.code}")
+            if (!r.isSuccessful) throw ShazamChanged("Shazam HTTP ${r.code} yanıtı verdi")
             r.body?.string().orEmpty()
         }
         return parse(text)
     }
 
     fun parse(json: String): Recognized? {
-        val track = JSONObject(json).optJSONObject("track") ?: return null
+        val root = try { JSONObject(json) } catch (e: Exception) { throw ShazamChanged("Shazam'ın yanıtı okunamadı") }
+        // Eşleşme yoksa yanıtta boş "matches" olur; ikisi de yoksa biçim değişmiş demektir
+        if (!root.has("matches") && !root.has("track")) throw ShazamChanged("Shazam'ın yanıt biçimi değişmiş")
+        val track = root.optJSONObject("track") ?: return null
         val title = track.optString("title").takeIf { it.isNotBlank() } ?: return null
         var album: String? = null
         val sections = track.optJSONArray("sections")

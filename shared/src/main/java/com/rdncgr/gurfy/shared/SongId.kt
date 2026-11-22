@@ -157,6 +157,7 @@ fun SongIdPanel(song: Song) {
                 Text(
                     r.message ?: "Şarkı tanınamadı", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
             } else {
                 Card(

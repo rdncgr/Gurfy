@@ -60,6 +60,16 @@ class GurfyApp : Application() {
     override fun onCreate() {
         super.onCreate()
         Graph.backendFactory = { ctx, _ -> GurfyBackend(ctx) }
+        // Arka plana geçince kullanıcı verisinin JSON yedeği (Documents/Gurfy)
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityStopped(a: android.app.Activity) { if (Local.ready) Backup.saveSoon() }
+            override fun onActivityCreated(a: android.app.Activity, b: android.os.Bundle?) {}
+            override fun onActivityStarted(a: android.app.Activity) {}
+            override fun onActivityResumed(a: android.app.Activity) {}
+            override fun onActivityPaused(a: android.app.Activity) {}
+            override fun onActivitySaveInstanceState(a: android.app.Activity, b: android.os.Bundle) {}
+            override fun onActivityDestroyed(a: android.app.Activity) {}
+        })
     }
 }
 
@@ -74,6 +84,7 @@ object Local {
     lateinit var service: LocalService
         private set
     val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val ready get() = ::db.isInitialized
 
     @Synchronized
     fun init(ctx: Context) {
@@ -96,10 +107,12 @@ class GurfyBackend(ctx: Context) : Backend {
     override val serviceReady: Boolean = true
     override val hasRemoteLibrary: Boolean = false
     override val accent: Color = Color(0xFF4BC3B4)
+    override val releaseTag = "gurfy-v"
 
     override fun start(ctx: Context) {
         Local.io.launch {
             Local.library.sync() // Müzik/Gurfy klasörüyle uzlaştır
+            Backup.afterStart() // yeniden kurulduysa yedek sorulur
             if (Local.db.jobs().activeCount() > 0) Downloads.start() // yarım kalan indirmeler
         }
     }
@@ -110,6 +123,9 @@ class GurfyBackend(ctx: Context) : Backend {
 
     @Composable
     override fun ConnectionSettings() = GurfyConnectionSettings()
+
+    @Composable
+    override fun Overlay() = RestoreDialog()
 }
 
 // --------------------------------------------------------- ayarlar: bağlantılar
@@ -123,6 +139,17 @@ private fun checkAll(): List<Status> {
         Status("YouTube", false, errorText(e, "Ulaşılamadı"))
     }
     out += Status("Müzik klasörü", true, "Music/Gurfy · ${Local.library.all().size} şarkı")
+    // Eşleşmeyecek bir imza gönderilir: yanıtın biçimi doğruysa servis çalışıyor demektir
+    out += try {
+        val noise = ShortArray(6 * ShazamSignature.RATE) { ((it * 7919L) % 2001 - 1000).toShort() }
+        ShazamApi.recognize(ShazamSignature.create(noise), Local.http)
+        Status("Şarkı tanıma (Shazam)", true, "Servis yanıt veriyor")
+    } catch (e: ShazamChanged) {
+        Status("Şarkı tanıma (Shazam)", false, "${e.message}. Yayın bilgisinden tanıma çalışır.")
+    } catch (e: Exception) {
+        Status("Şarkı tanıma (Shazam)", false, errorText(e, "Ulaşılamadı"))
+    }
+    out += Status("Yedek", if (Backup.lastOk() != null) true else null, Backup.describe())
     if (!Lfm.ready) {
         out += Status("Last.fm", null, "Anahtar girilmemiş: benzer şarkılar, öneriler, türler ve listeler kapalı")
     } else {
@@ -289,5 +316,6 @@ private fun GurfyConnectionSettings() {
             val list = statuses
             if (list == null) EmptyNote("Durumu görmek için yukarıdaki düğmeye dokun.") else list.forEach { StatusRow(it) }
         }
+        SettingsCard { BackupSettings() }
     }
 }

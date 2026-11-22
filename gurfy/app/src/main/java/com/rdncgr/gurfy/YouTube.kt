@@ -26,11 +26,20 @@ object YouTube {
     /** Sunucudaki MAX_DURATION: 20 dakikadan uzun videolar (kayıt, mix) indirilmez. */
     const val MAX_DURATION = 1200L
 
-    /** Yalnızca şarkılar (YouTube Music "Şarkılar" süzgeci): klip, kanal ve liste gelmez. */
+    /**
+     * Yalnızca şarkılar (YouTube Music "Şarkılar" süzgeci): klip, kanal ve liste gelmez.
+     * YouTube Music boş dönerse ya da hata verirse genel video aramasına düşülür; arama hiç boş kalmaz.
+     */
     fun search(query: String): List<Track> {
-        val ex = service.getSearchExtractor(query, listOf(YoutubeSearchQueryHandlerFactory.MUSIC_SONGS), "")
-        ex.fetchPage()
-        return ex.initialPage.items.filterIsInstance<StreamInfoItem>().mapNotNull { it.toTrack() }
+        val music = try {
+            val ex = service.getSearchExtractor(query, listOf(YoutubeSearchQueryHandlerFactory.MUSIC_SONGS), "")
+            ex.fetchPage()
+            ex.initialPage.items.filterIsInstance<StreamInfoItem>().mapNotNull { it.toTrack() }
+        } catch (e: Exception) {
+            android.util.Log.w("Gurfy", "YouTube Music araması başarısız, video aramasına geçiliyor", e)
+            emptyList()
+        }
+        return music.ifEmpty { searchVideos(query) }
     }
 
     /** Genel YouTube video araması (YouTube Music'te bulunmayanlar için yedek). */
@@ -40,13 +49,23 @@ object YouTube {
         return ex.initialPage.items.filterIsInstance<StreamInfoItem>().mapNotNull { it.toTrack() }
     }
 
-    fun idOf(url: String): String? = runCatching { service.streamLHFactory.getId(url) }.getOrNull()
+    private val VIDEO_ID = Regex("""(?:[?&]v=|youtu\.be/|/shorts/|/embed/)([A-Za-z0-9_-]{11})""")
+
+    /**
+     * Video kimliği. YouTube Music sonuçları "music.youtube.com/watch?v=…" adresiyle geliyor ve
+     * NewPipe bu adresi tanımıyor ("no suitable URL"): kimlik gerekirse adresten doğrudan okunur.
+     */
+    fun idOf(url: String): String? =
+        runCatching { service.streamLHFactory.getId(url) }.getOrNull() ?: VIDEO_ID.find(url)?.groupValues?.get(1)
+
+    /** Her adres NewPipe'ın tanıdığı biçime çevrilir (akış çözümü ve kütüphane eşleşmesi için). */
+    fun watchUrl(id: String) = "https://www.youtube.com/watch?v=$id"
 
     private fun StreamInfoItem.toTrack(): Track? {
         val id = idOf(url) ?: return null
         return Track(
             id = id,
-            url = url,
+            url = watchUrl(id),
             title = name,
             artist = uploaderName.orEmpty().removeSuffix(" - Topic"),
             durationSec = duration,
@@ -58,7 +77,7 @@ object YouTube {
 
     /** En iyi ses akışı. M4A (AAC) tercih edilir: dönüştürme gerekmez, etiket yazılabilir, her telefonda çalar. */
     fun bestAudio(url: String): Audio {
-        val info = StreamInfo.getInfo(service, url)
+        val info = StreamInfo.getInfo(service, idOf(url)?.let(::watchUrl) ?: url)
         val audios = info.audioStreams.filter { it.isUrl && it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP }
         val best = audios.filter { it.format == MediaFormat.M4A }.maxByOrNull { it.averageBitrate }
             ?: audios.maxByOrNull { it.averageBitrate }

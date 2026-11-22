@@ -234,6 +234,8 @@ fun NotaApp() {
         )
     }
     val top = nav.top
+    UpdateDialog()
+    Graph.backend.Overlay()
 
     Scaffold(
         bottomBar = {

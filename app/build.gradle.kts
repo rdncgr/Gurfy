@@ -4,7 +4,12 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val buildNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+// Sürüm app/surum.txt dosyasında ("1.0", "1.1", "1.1.1"). Kullanıcıya giden her değişiklikte artırılır;
+// CI aynı sürümü ikinci kez yayınlamaz. versionCode sürümden türetilir: 1.2.3 -> 10203.
+val appVersion = rootProject.file("app/surum.txt").readText().trim()
+val appVersionCode = appVersion.split(".").map { it.toInt() }.let { v ->
+    v.getOrElse(0) { 0 } * 10000 + v.getOrElse(1) { 0 } * 100 + v.getOrElse(2) { 0 }
+}
 
 android {
     namespace = "com.rdncgr.gurfysync"
@@ -14,8 +19,8 @@ android {
         applicationId = "com.rdncgr.gurfysync"
         minSdk = 26
         targetSdk = 35
-        versionCode = buildNumber
-        versionName = "0.1.$buildNumber"
+        versionCode = appVersionCode
+        versionName = appVersion
     }
 
     // Her derlemede aynı imza kullanılsın ki yeni sürüm eskisinin üzerine kurulabilsin

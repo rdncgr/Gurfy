@@ -43,22 +43,36 @@ jobs:
             echo "::error::KEYSTORE_BASE64 çözülemedi"; exit 1
           fi
 
+      # Sürüm gurfy/surum.txt dosyasından. Bu sürüm daha önce yayınlandıysa yalnızca derlenir, yeni sürüm çıkmaz.
+      - name: Sürümü oku
+        id: v
+        run: |
+          V=$(tr -d '[:space:]' < gurfy/surum.txt)
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/gurfy-v$V" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Gurfy $V zaten yayınlanmış. Yeni sürüm için gurfy/surum.txt artırılmalı."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: APK derle
         run: gradle :gurfy:assembleRelease --no-daemon --stacktrace
 
       - name: APK adını düzenle
-        run: cp gurfy/app/build/outputs/apk/release/gurfy-release.apk gurfy-${{ github.run_number }}.apk
+        run: cp gurfy/app/build/outputs/apk/release/gurfy-release.apk gurfy-${{ steps.v.outputs.version }}.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: gurfy-apk
-          path: gurfy-${{ github.run_number }}.apk
+          path: gurfy-${{ steps.v.outputs.version }}.apk
 
-      # Etiketler "gurfy-" ile başlar: Gurfy Sync'in "surum-N" etiketleriyle çakışmaz
+      # Etiketler "gurfy-v" ile başlar ("gurfy-sync-v" Gurfy Sync'in); uygulama güncellemeyi buradan bulur
       - name: Sürüm olarak yayınla
+        if: steps.v.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: gurfy-${{ github.run_number }}
-          name: Gurfy ${{ github.run_number }}
+          tag_name: gurfy-v${{ steps.v.outputs.version }}
+          name: Gurfy ${{ steps.v.outputs.version }}
           make_latest: false
-          files: gurfy-${{ github.run_number }}.apk
+          files: gurfy-${{ steps.v.outputs.version }}.apk

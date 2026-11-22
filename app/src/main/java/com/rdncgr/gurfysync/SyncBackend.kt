@@ -30,6 +30,7 @@ class SyncBackend(ctx: Context, private val settings: Settings) : Backend {
     override val serviceReady: Boolean get() = settings.serviceUrl.isNotBlank()
     override val hasRemoteLibrary: Boolean = true
     override val accent: Color = Color(0xFFF2B84B)
+    override val releaseTag = "gurfy-sync-v"
 
     override fun start(ctx: Context) = SettingsBackup.start(settings.prefs)
 

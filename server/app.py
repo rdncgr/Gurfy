@@ -812,7 +812,8 @@ def health():
             "download_delay": [DOWNLOAD_DELAY_MIN, DOWNLOAD_DELAY_MAX],
             "navidrome_error": nav_error, "navidrome_url": NAVIDROME_URL,
             "spotify_api": bool(SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET),
-            "yt_dlp": ytv, "shazam": _has("shazamio"), "music_dir_writable": os.access(MUSIC_DIR, os.W_OK)}
+            "yt_dlp": ytv, "shazam": _has("shazamio"), "music_dir_writable": os.access(MUSIC_DIR, os.W_OK),
+            "youtube_watch": read_json(WATCH_FILE, {}).get("last")}
 
 
 STATUS_PAGE = """<!doctype html>
@@ -855,10 +856,23 @@ const items = h => [
  ["YouTube bot koruması", h.po_token, h.po_token ? "PO token sağlayıcısı çalışıyor" : "bgutil-provider konteynerine ulaşılamıyor"],
  ["YouTube IPv6", h.youtube_ipv6, h.youtube_ipv6 ? "IPv6 ile çıkılıyor" : "Yalnızca IPv4; bot engeli daha sık olabilir"],
  ["Radyoda şarkı tanıma", h.shazam, h.shazam ? "Hazır" : "shazamio kurulu değil"],
+ ...watchRows(h.youtube_watch),
 ];
+const when = t => new Date(t * 1000).toLocaleString('tr-TR', {dateStyle: 'short', timeStyle: 'short'});
+function watchRows(w) {
+ if (!w) return [["YouTube denetimi", null, "Henüz yapılmadı (servis açıldıktan birkaç dakika sonra başlar)"]];
+ const y = w.ytdlp || {}, n = w.newpipe || {};
+ return [
+  ["YouTube denetimi", y.ok, (y.ok ? "Arama ve ses akışı çalışıyor" : (y.bot ? "Bot engeli: " : "Bozuk: ") + (y.error || "")) + " · " + when(w.checked_at)],
+  ["yt-dlp sürümü", !w.ytdlp_update, w.ytdlp_update ? `Yeni sürüm var (${w.ytdlp_latest}); konteyneri yeniden başlat` : "Güncel (" + (w.ytdlp_version || "?") + ")"],
+  ["Gurfy'nin YouTube kütüphanesi", n.gurfy && n.latest ? !n.update : null,
+   n.update ? `NewPipeExtractor ${n.latest} çıktı (${n.latest_date}), Gurfy'de ${n.gurfy}: yeni Gurfy sürümü gerekli` : (n.error || "Güncel (" + (n.gurfy || "?") + ")")],
+  ["Shazam denetimi", w.shazam ? w.shazam.ok : null, w.shazam ? (w.shazam.ok ? "Yanıt veriyor (Gurfy Sync ve Gurfy)" : "Bozuk: " + (w.shazam.error || "")) : "Henüz yapılmadı"],
+ ];
+}
 fetch('/health').then(r => r.json()).then(h => {
  document.getElementById('status').innerHTML = items(h).map(([t, ok, d]) =>
-  `<div class="row"><div class="dot ${ok ? 'ok' : 'bad'}"></div><div><b>${t}</b><span></span></div></div>`).join('');
+  `<div class="row"><div class="dot ${ok === null ? '' : ok ? 'ok' : 'bad'}"></div><div><b>${t}</b><span></span></div></div>`).join('');
  document.querySelectorAll('#status .row span').forEach((s, i) => s.textContent = items(h)[i][2]);
 }).catch(() => { document.getElementById('status').innerHTML = '<div class="row"><div class="dot bad"></div><div><b>Durum alınamadı</b></div></div>'; });
 </script></body></html>"""
@@ -1146,6 +1160,176 @@ def radio_refresher():
 
 
 threading.Thread(target=radio_refresher, daemon=True).start()
+
+
+# ---------------------------------------------------------------- YouTube ve Shazam gözcüsü
+# YouTube sayfa yapısını ya da korumasını değiştirince indirme bozulur; Shazam resmi olmayan adresini
+# değiştirirse şarkı tanıma bozulur. Servis sürekli açık olduğu için belli aralıklarla kendini sınar:
+# yt-dlp ile arama + ses akışı çözümü, Shazam'a eşleşmeyecek bir ses gönderip yanıt biçimine bakma,
+# yt-dlp'nin ve Gurfy'nin (sunucusuz uygulama) kullandığı NewPipeExtractor'ın yeni sürümü çıktı mı.
+# Uygulamalar bir şey bildirmez; sorunları buradan izleriz.
+# Durum değişince notify() çağrılır; bildirim kanalı (Telegram, ntfy…) daha sonra oraya bağlanacak.
+
+WATCH_FILE = Path(os.getenv("YOUTUBE_WATCH_FILE", "/app/youtube-durum.json"))
+WATCH_HOURS = float(os.getenv("YOUTUBE_WATCH_HOURS", "6"))
+WATCH_QUERY = os.getenv("YOUTUBE_WATCH_QUERY", "Tarkan Şımarık")
+GURFY_GRADLE_URL = os.getenv(
+    "GURFY_GRADLE_URL", "https://raw.githubusercontent.com/rdncgr/Nota/main/gurfy/app/build.gradle.kts")
+_watch_lock = threading.Lock()
+
+
+def notify(title: str, body: str) -> None:
+    """Bildirim noktası. Şimdilik yalnızca günlüğe yazar; bildirim kanalı sonra buraya bağlanacak."""
+    print(f"[gurfy-bildirim] {title}: {body}", flush=True)
+
+
+def _version_tuple(v: str) -> tuple:
+    return tuple(int(x) for x in re.findall(r"\d+", v or ""))
+
+
+def check_ytdlp() -> dict:
+    """yt-dlp ile tek şarkı arar ve ses akışını çözer (indirmez)."""
+    import yt_dlp
+
+    started = time.time()
+    try:
+        opts = ytdlp_opts(quiet=True, no_warnings=True, skip_download=True, noplaylist=True,
+                          format="bestaudio/best")
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(f"ytsearch1:{WATCH_QUERY}", download=False)
+        entry = (info.get("entries") or [None])[0] or {}
+        if not entry.get("url") and not entry.get("requested_formats"):
+            return {"ok": False, "error": "Arama sonuç verdi ama ses akışı çözülemedi"}
+        return {"ok": True, "title": entry.get("title"), "seconds": round(time.time() - started, 1)}
+    except Exception as e:
+        msg = str(e)
+        return {"ok": False, "bot": bool(BOT_ERROR.search(msg)), "error": tr_error(msg)}
+
+
+def check_shazam() -> dict:
+    """Shazam'a 6 sn'lik gürültü gönderir: eşleşme beklenmez ama yanıtta "matches" alanı olmalı.
+    Gurfy aynı adresi (amp.shazam.com) kendi Kotlin imzasıyla kullanıyor; bu sınama ikisini de kapsar."""
+    if not _has("shazamio"):
+        return {"ok": False, "error": "shazamio kurulu değil"}
+    import asyncio
+    import random
+    import tempfile
+    import wave
+    from shazamio import Shazam
+
+    path = Path(tempfile.gettempdir()) / "gurfy-shazam-sinama.wav"
+    rnd = random.Random(7)
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(16000)
+        w.writeframes(b"".join(rnd.randint(-3000, 3000).to_bytes(2, "little", signed=True) for _ in range(16000 * 6)))
+
+    async def run():
+        async with Shazam(language="tr", endpoint_country="TR") as sz:
+            return await sz.recognize(str(path))
+
+    try:
+        res = asyncio.run(run())
+        if not isinstance(res, dict) or ("matches" not in res and "track" not in res):
+            return {"ok": False, "error": "Shazam'ın yanıt biçimi değişmiş: " + str(res)[:160]}
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:160]}"}
+    finally:
+        path.unlink(missing_ok=True)
+
+
+def latest_ytdlp() -> Optional[str]:
+    try:
+        return requests.get("https://pypi.org/pypi/yt-dlp/json", timeout=15).json()["info"]["version"]
+    except Exception:
+        return None
+
+
+def check_newpipe() -> dict:
+    """Gurfy'deki NewPipeExtractor sürümü ile en yenisi. Yeni sürüm çoğu zaman bir YouTube kırılmasının
+    düzeltmesidir: Gurfy'nin sürümü yükseltilip yeni APK çıkarılmalı."""
+    out = {"gurfy": None, "latest": None, "latest_date": None, "update": False}
+    try:
+        m = re.search(r"NewPipeExtractor:(v?[\d.]+)", requests.get(GURFY_GRADLE_URL, timeout=15).text)
+        out["gurfy"] = m.group(1) if m else None
+    except Exception as e:
+        out["error"] = f"Gurfy sürümü okunamadı: {type(e).__name__}"
+    try:
+        r = requests.get("https://api.github.com/repos/TeamNewPipe/NewPipeExtractor/releases/latest",
+                         timeout=15, headers={"Accept": "application/vnd.github+json"}).json()
+        out["latest"], out["latest_date"] = r.get("tag_name"), (r.get("published_at") or "")[:10]
+    except Exception as e:
+        out["error"] = f"NewPipeExtractor sürümü okunamadı: {type(e).__name__}"
+    if out["gurfy"] and out["latest"]:
+        out["update"] = _version_tuple(out["latest"]) > _version_tuple(out["gurfy"])
+    return out
+
+
+def run_youtube_watch() -> dict:
+    with _watch_lock:
+        try:
+            import yt_dlp
+            installed = yt_dlp.version.__version__
+        except Exception:
+            installed = None
+        latest = latest_ytdlp()
+        result = {
+            "checked_at": int(time.time()),
+            "ytdlp": check_ytdlp() if installed else {"ok": False, "error": "yt-dlp kurulu değil"},
+            "ytdlp_version": installed, "ytdlp_latest": latest,
+            "ytdlp_update": bool(installed and latest and _version_tuple(latest) > _version_tuple(installed)),
+            "newpipe": check_newpipe(),
+            "shazam": check_shazam(),
+        }
+        old = read_json(WATCH_FILE, {})
+        prev = old.get("last") or {}
+        history = (old.get("history") or [])[-29:] + [
+            {"t": result["checked_at"], "ok": result["ytdlp"]["ok"], "error": result["ytdlp"].get("error")}]
+        if prev:
+            if prev.get("ytdlp", {}).get("ok") and not result["ytdlp"]["ok"]:
+                notify("YouTube indirme bozuldu", result["ytdlp"].get("error") or "")
+            elif not prev.get("ytdlp", {}).get("ok", True) and result["ytdlp"]["ok"]:
+                notify("YouTube indirme düzeldi", "yt-dlp yeniden çalışıyor")
+        if prev:
+            was = prev.get("shazam", {}).get("ok")
+            if was and not result["shazam"]["ok"]:
+                notify("Şarkı tanıma bozuldu", result["shazam"].get("error") or "")
+            elif was is False and result["shazam"]["ok"]:
+                notify("Şarkı tanıma düzeldi", "Shazam yeniden yanıt veriyor")
+        np = result["newpipe"]
+        if np["update"] and np["latest"] != prev.get("newpipe", {}).get("latest"):
+            notify("Gurfy için güncelleme gerekli",
+                   f"NewPipeExtractor {np['latest']} çıktı (Gurfy'de {np['gurfy']})")
+        try:
+            WATCH_FILE.write_text(json.dumps({"last": result, "history": history}, ensure_ascii=False),
+                                  encoding="utf-8")
+        except Exception:
+            pass
+        return result
+
+
+def youtube_watcher():
+    time.sleep(90)  # açılışta PO token sağlayıcısı hazır olsun
+    while True:
+        try:
+            run_youtube_watch()
+        except Exception as e:
+            print(f"YouTube gözcüsü hatası: {e}", flush=True)
+        time.sleep(max(WATCH_HOURS, 0.5) * 3600)
+
+
+threading.Thread(target=youtube_watcher, daemon=True).start()
+
+
+@app.get("/youtube/status")
+def youtube_status(refresh: bool = False, x_api_key: str = Header(default="")):
+    """Son denetim sonucu ve geçmiş. refresh=true şimdi sınar (yalnızca servis parolasıyla)."""
+    if refresh:
+        auth(x_api_key)
+        run_youtube_watch()
+    return read_json(WATCH_FILE, {"last": None, "history": []})
 
 
 @app.get("/radios", dependencies=[Depends(auth)])

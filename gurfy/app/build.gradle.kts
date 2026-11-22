@@ -5,7 +5,12 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-val buildNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+// Sürüm gurfy/surum.txt dosyasında ("1.0", "1.1", "1.1.1"). Kullanıcıya giden her değişiklikte artırılır;
+// CI aynı sürümü ikinci kez yayınlamaz. versionCode sürümden türetilir: 1.2.3 -> 10203.
+val appVersion = rootProject.file("gurfy/surum.txt").readText().trim()
+val appVersionCode = appVersion.split(".").map { it.toInt() }.let { v ->
+    v.getOrElse(0) { 0 } * 10000 + v.getOrElse(1) { 0 } * 100 + v.getOrElse(2) { 0 }
+}
 
 android {
     // Gurfy Sync "com.rdncgr.gurfysync" kullanır; iki uygulama telefonda yan yana kurulabilsin diye kimlik farklı
@@ -17,8 +22,8 @@ android {
         // Android 10+: şarkılar MediaStore ile ortak Müzik/Gurfy klasörüne yazılır (izin gerekmez)
         minSdk = 29
         targetSdk = 35
-        versionCode = buildNumber
-        versionName = "0.1.$buildNumber"
+        versionCode = appVersionCode
+        versionName = appVersion
     }
 
     // Aynı imza: yeni sürüm eskisinin üzerine kurulur (anahtar depo kökündeki keystore/ klasöründe)

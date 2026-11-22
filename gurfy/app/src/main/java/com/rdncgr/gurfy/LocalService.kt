@@ -233,6 +233,11 @@ class LocalService(private val ctx: Context) : MusicService {
         }
         val hit = try {
             ShazamApi.recognize(ShazamSignature.create(AudioTap.last(12 * ShazamSignature.RATE)), Local.http)
+        } catch (e: ShazamChanged) {
+            return Recognition(
+                null, "shazam", null, station,
+                "Şarkı tanıma servisi (Shazam) değişmiş olabilir: ${e.message}. Yayın bilgisinden tanıma çalışmaya devam eder.",
+            )
         } catch (e: Exception) {
             throw IOException("Tanıma servisine ulaşılamadı", e)
         } ?: return Recognition(

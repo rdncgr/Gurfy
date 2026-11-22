@@ -10,7 +10,8 @@
 | Derleme | `./derle.sh` -> `gurfy-sync.apk` | `gurfy/derle.sh` -> `gurfy/gurfy.apk` |
 | Emülatör | `telefon.bat` | `gurfy/telefon.bat` |
 | CI | `.github/workflows/apk.yml` (`gurfy/**` hariç) | `.github/workflows/gurfy-apk.yml` (`gurfy/**` ve `shared/**`) |
-| Release etiketi | `surum-N`, `gurfy-sync-N.apk` | `gurfy-N`, `gurfy-N.apk` |
+| Sürüm dosyası | `app/surum.txt` | `gurfy/surum.txt` |
+| Release etiketi | `gurfy-sync-vX.Y`, `gurfy-sync-X.Y.apk` | `gurfy-vX.Y`, `gurfy-X.Y.apk` |
 | Simge / vurgu rengi | Sarı `#F2B84B` | Turkuaz `#4BC3B4` |
 
 ## Yapı
@@ -19,11 +20,20 @@
 - Ekranlar veriyi yalnızca `shared/.../Backend.kt` arayüzlerinden alır: `Library` (Navidrome'un işi) ve
   `MusicService` (Gurfy servisinin işi). Adlar eski kodla uyum için `Graph.subsonic` ve `Graph.service`.
 - Her uygulama kendi `Application` sınıfında `Graph.backendFactory`'yi doldurur (`SyncApp`, `GurfyApp`).
-- Uygulamaya göre değişen davranış `Backend` bayraklarıyla seçilir (`hasRemoteLibrary`, `accent`, `audioProcessors`,
-  `ConnectionSettings`); metinler `Words` nesnesinde.
+- Uygulamaya göre değişen davranış `Backend` bayraklarıyla seçilir (`hasRemoteLibrary`, `accent`, `releaseTag`,
+  `audioProcessors`, `ConnectionSettings`, `Overlay`); metinler `Words` nesnesinde.
+- Güncelleme denetimi ortak (`shared/.../Updates.kt`): GitHub etiketi `releaseTag` + sürüm ("gurfy-v1.2"),
+  kurulu versionName ile sayı sayı karşılaştırılır. Uygulama içinden sorun bildirme yok (son kullanıcıda GitHub yok).
+- Sunucudaki gözcü (`server/app.py`, "YouTube ve Shazam gözcüsü") YouTube'u ve Shazam'ı sınar, Gurfy'nin
+  NewPipeExtractor sürümünü `gurfy/app/build.gradle.kts`'ten GitHub üzerinden okur; bağımlılık satırının biçimi korunmalı.
 
 ## Kurallar
 
+- **Sürüm:** kullanıcıya giden her değişiklikte sürüm dosyası artırılır: küçük düzeltme/özellik 1.0 -> 1.1,
+  büyük değişiklik 2.0. `shared/` değişince iki dosya da artar. versionCode sürümden türetilir (1.2.3 -> 10203).
+  CI aynı sürümü ikinci kez yayınlamaz (yalnızca derler), yani sürüm artırılmadan gönderilen değişiklik
+  kullanıcıya gitmez.
+- **Lisans:** depo GPL-3.0 (`LICENSE`; NewPipeExtractor GPL-3.0). Yeni bağımlılık GPL-3.0 ile uyumlu olmalı.
 - Ekran / arayüz değişikliği `shared/` içinde yapılır ve iki uygulamaya birden gelir. Değiştikten sonra iki APK da
   derlenip denenir. Yalnızca bir uygulamaya özel davranış gerekiyorsa `Backend`'e bayrak eklenir.
 - Veri katmanı yalnızca kendi modülündedir: `:gurfy` `com.rdncgr.gurfysync` paketini ya da `server/app.py`'yi asla

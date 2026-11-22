@@ -845,7 +845,10 @@ fun SettingsScreen(nav: Nav) {
                         SettingsCard { CrossfadeSettings() }
                     }
                     "Çevrimdışı" -> SettingsCard { OfflineSettings() }
-                    else -> Graph.backend.ConnectionSettings()
+                    else -> {
+                        Graph.backend.ConnectionSettings()
+                        SettingsCard { UpdateSettings() }
+                    }
                 }
                 Spacer(Modifier.height(24.dp))
             }

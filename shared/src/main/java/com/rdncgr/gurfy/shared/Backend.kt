@@ -34,6 +34,9 @@ interface Backend {
     /** Arayüzün vurgu rengi (Sync sarı, Gurfy turkuaz). */
     val accent: Color
 
+    /** GitHub sürüm etiketinin öneki (Sync "surum-", Gurfy "gurfy-"); güncelleme denetimi için. */
+    val releaseTag: String
+
     /** Graph hazır olunca bir kez çağrılır (Sync: ayar yedeği). */
     fun start(ctx: Context) {}
 
@@ -43,6 +46,10 @@ interface Backend {
     /** Ayarlar > Bağlantılar sekmesinin içeriği. */
     @Composable
     fun ConnectionSettings()
+
+    /** Her ekranın üstünde gösterilebilecek pencereler (Gurfy: yeniden kurulumda yedek sorusu). */
+    @Composable
+    fun Overlay() {}
 }
 
 /** Navidrome'un (Subsonic API) karşılığı. Sync'te ağdan, Gurfy'de telefondaki veritabanından. */
