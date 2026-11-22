@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.Gurfy" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF121417</item>
+        <item name="android:statusBarColor">#FF121417</item>
+        <item name="android:navigationBarColor">#FF121417</item>
+    </style>
+</resources>

@@ -9,8 +9,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
+import com.rdncgr.gurfy.shared.Graph
 
 /**
  * Ayarların sunucuda yedeği. Uygulama silinip yeniden kurulunca yalnızca servis parolasını
@@ -82,38 +81,4 @@ object SettingsBackup {
             }
         }
     }
-}
-
-/** SharedPreferences ↔ JSON (türüyle birlikte). */
-fun SharedPreferences.exportJson(keys: Set<String>): JSONObject {
-    val o = JSONObject()
-    all.filterKeys { it in keys }.forEach { (k, v) ->
-        val (t, value) = when (v) {
-            is Boolean -> "b" to v
-            is Int -> "i" to v
-            is Long -> "l" to v
-            is Float -> "f" to v.toDouble()
-            is Set<*> -> "s" to JSONArray(v.map { it.toString() })
-            else -> "t" to v.toString()
-        }
-        o.put(k, JSONObject().put("t", t).put("v", value))
-    }
-    return o
-}
-
-fun SharedPreferences.importJson(data: JSONObject, keys: Set<String>) {
-    val e = edit()
-    data.keys().forEach { k ->
-        if (k !in keys) return@forEach
-        val item = data.optJSONObject(k) ?: return@forEach
-        when (item.optString("t")) {
-            "b" -> e.putBoolean(k, item.optBoolean("v"))
-            "i" -> e.putInt(k, item.optInt("v"))
-            "l" -> e.putLong(k, item.optLong("v"))
-            "f" -> e.putFloat(k, item.optDouble("v").toFloat())
-            "s" -> e.putStringSet(k, item.optJSONArray("v")?.let { a -> (0 until a.length()).map { a.getString(it) }.toSet() })
-            else -> e.putString(k, item.optString("v"))
-        }
-    }
-    e.commit()
 }

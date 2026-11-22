@@ -1,0 +1,4 @@
+<resources>
+    <!-- Gurfy Sync sarı (#F2B84B), Gurfy turkuaz: telefonda iki simge karışmasın -->
+    <color name="launcher_bg">#FF4BC3B4</color>
+</resources>

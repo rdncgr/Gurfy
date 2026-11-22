@@ -3,6 +3,12 @@ name: APK Derle
 on:
   push:
     branches: [main]
+    # Yalnızca Gurfy'ye (sunucusuz uygulama) ait değişiklikler Gurfy Sync sürümü çıkarmasın: o, gurfy-apk.yml'de derlenir.
+    # Ortak arayüz (shared/) değişince iki uygulama da derlenir.
+    paths-ignore:
+      - "gurfy/**"
+      - ".github/workflows/gurfy-apk.yml"
+      - "CLAUDE.md"
   workflow_dispatch:
 
 permissions:

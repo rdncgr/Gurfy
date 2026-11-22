@@ -132,6 +132,10 @@ Daha uzun listeler için YAML'a `SPOTIFY_CLIENT_ID` ve `SPOTIFY_CLIENT_SECRET` e
 
 ## Geliştiriciler için
 
+> Bu depoda ikinci bir uygulama da var: [`gurfy/`](gurfy/README.md) klasöründeki **Gurfy**,
+> aynı arayüzle ama sunucu gerektirmeden her şeyi telefonda yapar (ayrı paket, ayrı sürümler).
+> Ekranlar iki uygulamada ortak: `shared/` modülü. Gurfy Sync'e özel veri katmanı `app/`, Gurfy'ninki `gurfy/app/`.
+
 - Uygulama: Kotlin, Jetpack Compose, Media3 (ExoPlayer). Servis: Python, FastAPI, yt-dlp, shazamio.
 - `main` dalına her gönderimde GitHub Actions APK'yı derleyip Releases'a koyar.
 - İmza anahtarı depoda tutulmaz. Kendi kopyanda Settings > Secrets and variables > Actions altına
