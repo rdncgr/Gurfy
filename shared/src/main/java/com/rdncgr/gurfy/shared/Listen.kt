@@ -77,8 +77,8 @@ import java.io.ByteArrayOutputStream
 import kotlin.math.sqrt
 
 // Şarkı bulma topu: diğer uygulamaların üzerinde duran yuvarlak düğme. Dokununca telefonda çalan sesi
-// (Instagram, YouTube…) 10 sn dinler, şarkıyı bulur ve indirmeyi önerir. Ses mikrofondan dinlenir (izin penceresi yok);
-// yalnızca kulaklık takılıyken cihazın sesi alınır, Android bunu "ekran kaydı" izniyle verdiği için o zaman izin sorulur.
+// (Instagram, YouTube…) 11 sn dinler, şarkıyı bulur ve indirmeyi önerir. Topa dokununca "Telefon sesi" ya da "Mikrofon" seçilir;
+// telefon sesini Android yalnızca "ekran kaydı" izniyle verir, o yüzden onu seçince her seferinde izin sorulur.
 // Top ekranın istenen yerine sürüklenir; sürüklerken altta çıkan X'in üzerine bırakılırsa kapanır.
 // Gurfy tanımayı telefonda yapar, Gurfy Sync kaydı sunucuya gönderir (MusicService.recognizeAudio).
 
@@ -254,7 +254,7 @@ class ProjectionActivity : ComponentActivity() {
         if (res.resultCode == RESULT_OK && res.data != null) {
             i.setAction(ListenService.CAPTURE).putExtra("code", res.resultCode).putExtra("data", res.data)
         } else {
-            i.setAction(ListenService.CAPTURE_MIC)
+            i.setAction(ListenService.CAPTURE_DENIED)
         }
         startService(i)
         finish()
@@ -272,7 +272,7 @@ class ProjectionActivity : ComponentActivity() {
                 } else mpm.createScreenCaptureIntent(),
             )
         } catch (e: Exception) {
-            startService(Intent(this, ListenService::class.java).setAction(ListenService.CAPTURE_MIC))
+            startService(Intent(this, ListenService::class.java).setAction(ListenService.CAPTURE_DENIED))
             finish()
         }
     }
@@ -286,6 +286,7 @@ class ListenService : Service() {
         const val STOP = "kapat"
         const val CAPTURE = "cihaz-sesi"
         const val CAPTURE_MIC = "mikrofon"
+        const val CAPTURE_DENIED = "cihaz-sesi-yok"
         private const val CHANNEL = "sarki-bulma"
         private const val NOTIF_ID = 7301
         private const val RATE = 16000
@@ -332,6 +333,7 @@ class ListenService : Service() {
                 listen(projection)
             }
             CAPTURE_MIC -> listen(null)
+            CAPTURE_DENIED -> showMessage("Telefon sesi için izin verilmedi. Topa dokunup yeniden dene ya da Mikrofon'u seç.")
         }
         return START_NOT_STICKY
     }
@@ -439,6 +441,7 @@ class ListenService : Service() {
                         moved = true
                         // Alttaki sonuç/hata kartı X'in üstünü örter; sürüklerken kaldırılır
                         if (job?.isActive != true) removeCard()
+                        removeChoice()
                         showTrash()
                     }
                     if (moved) {
@@ -471,6 +474,7 @@ class ListenService : Service() {
     private fun removeBall() {
         ListenBubble.onAppShown = null
         pulse?.cancel(); pulse = null
+        removeChoice()
         removeTrash()
         ball?.let { try { wm.removeView(it) } catch (e: Exception) { } }
         ball = null
@@ -563,35 +567,83 @@ class ListenService : Service() {
         }
     }
 
+    /** Dokununca topun yanında iki seçenek açılır: telefonun kendi sesi ya da mikrofon. */
     private fun onTap() {
         if (job?.isActive == true) return
+        if (choice != null) { removeChoice(); return }
         removeCard()
-        // Ses mikrofondan dinlenir. Yalnızca kulaklık takılıyken (mikrofon telefonun sesini duyamaz) cihazın
-        // sesi alınır; Android bunu yalnızca "ekran kaydı" izniyle verir, o yüzden izin penceresi çıkar.
-        if (Build.VERSION.SDK_INT >= 29 && headphones()) {
-            try {
-                startActivity(
-                    Intent(this, ProjectionActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
-                )
-                return
-            } catch (e: Exception) { /* açılamadıysa mikrofonla devam */ }
-        }
-        listen(null)
+        showChoice()
     }
 
-    /** Ses kulaklığa / Bluetooth'a mı gidiyor. */
-    private fun headphones(): Boolean {
-        val am = getSystemService(android.media.AudioManager::class.java)
-        val types = mutableSetOf(
-            android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET, android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
-            android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, android.media.AudioDeviceInfo.TYPE_USB_HEADSET,
-        )
-        if (Build.VERSION.SDK_INT >= 31) {
-            types += android.media.AudioDeviceInfo.TYPE_BLE_HEADSET
-            types += android.media.AudioDeviceInfo.TYPE_BLE_SPEAKER
+    /** Telefonun çaldığı ses. Android bunu yalnızca "ekran kaydı/paylaşımı" izniyle verir; pencere her seferinde çıkar. */
+    private fun listenPhone() {
+        if (Build.VERSION.SDK_INT < 29) {
+            showMessage("Telefon sesini dinlemek için Android 10 ya da üstü gerekir. Mikrofonu kullanabilirsin.")
+            return
         }
-        return am.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS).any { it.type in types }
+        try {
+            startActivity(
+                Intent(this, ProjectionActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
+            )
+        } catch (e: Exception) {
+            showMessage("Telefon sesi izni açılamadı. Mikrofonu deneyebilirsin.")
+        }
+    }
+
+    // ---------------------------------------------------- Telefon / Mikrofon seçimi
+
+    private var choice: View? = null
+    private val hideChoice = Runnable { removeChoice() }
+
+    private fun removeChoice() {
+        main.removeCallbacks(hideChoice)
+        choice?.let { try { wm.removeView(it) } catch (e: Exception) { } }
+        choice = null
+    }
+
+    private fun choiceRow(icon: String, label: String, onClick: () -> Unit) = TextView(this).apply {
+        text = "$icon  $label"
+        textSize = 16f
+        typeface = Typeface.DEFAULT_BOLD
+        setTextColor(0xFFFFFFFF.toInt())
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(16), dp(12), dp(20), dp(12))
+        background = GradientDrawable().apply { cornerRadius = dp(14).toFloat(); setColor(0x22FFFFFF) }
+        setOnClickListener { removeChoice(); onClick() }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun showChoice() {
+        removeChoice()
+        val b = ballParams ?: return
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(0xF2202329.toInt()) }
+            elevation = dp(8).toFloat()
+            val lp = { top: Int -> LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = top } }
+            addView(choiceRow("📱", "Telefon sesi") { listenPhone() }, lp(0))
+            addView(choiceRow("🎤", "Mikrofon") { listen(null) }, lp(dp(6)))
+            // Seçeneklerin dışına dokununca kapanır
+            setOnTouchListener { _, e -> if (e.actionMasked == MotionEvent.ACTION_OUTSIDE) removeChoice(); false }
+        }
+        box.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        val dm = resources.displayMetrics
+        val ballSize = dp(60)
+        val w = box.measuredWidth
+        val h = box.measuredHeight
+        val p = overlayParams(WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.TOP or Gravity.START
+            flags = flags or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+            // Top ekranın sağ yarısındaysa seçenekler soluna, sol yarısındaysa sağına açılır
+            x = if (b.x + ballSize / 2 > dm.widthPixels / 2) b.x - w - dp(8) else b.x + ballSize + dp(8)
+            x = x.coerceIn(0, maxOf(0, dm.widthPixels - w))
+            y = (b.y + ballSize / 2 - h / 2).coerceIn(0, maxOf(0, dm.heightPixels - h))
+        }
+        try { wm.addView(box, p) } catch (e: Exception) { listen(null); return }
+        choice = box
+        main.postDelayed(hideChoice, 8_000)
     }
 
     // ------------------------------------------------------------- dinleme
@@ -604,7 +656,7 @@ class ListenService : Service() {
             return
         }
         setListening(true)
-        showMessage(if (projection != null) "Dinleniyor… (cihaz sesi)" else "Dinleniyor… (mikrofon)", buttons = false)
+        showMessage(if (projection != null) "Dinleniyor… (telefon sesi)" else "Dinleniyor… (mikrofon)", buttons = false)
         job = scope.launch {
             try {
                 val (pcm, how) = withContext(Dispatchers.IO) { capture(projection) }
