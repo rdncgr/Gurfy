@@ -616,7 +616,12 @@ fun NowPlayingScreen(nav: Nav) {
                     )
                 }
             }
-            if (radio) RadioFavoriteButton(song)
+            if (radio) {
+                RadioFavoriteButton(song)
+                IconButton(onClick = { nav.tab(Screen.Library); LibraryTab.selected = 4 }) {
+                    Icon(Icons.Filled.Radio, contentDescription = "Kütüphane > Radyo")
+                }
+            }
             if (!radio) {
                 IconButton(onClick = { nav.push(Screen.Similar(song.artist, song.title)) }) {
                     Icon(Icons.Filled.TravelExplore, contentDescription = "Benzerlerini bul")
@@ -687,7 +692,17 @@ fun NowPlayingScreen(nav: Nav) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Şarkıda: solda karışık modu, sağda tekrar; ortada önceki / çal / sonraki
-            if (!radio) IconButton(onClick = { p.cycleMode() }) { PlayModeIcon(p.mode) }
+            if (radio) {
+                val shuffleOn = p.radioShuffle && !p.radioFromFavorites
+                IconButton(enabled = !p.radioFromFavorites, onClick = { p.toggleRadioShuffle() }) {
+                    Icon(
+                        Icons.Filled.Shuffle,
+                        contentDescription = if (shuffleOn) "Rastgele radyo açık" else "Rastgele radyo kapalı",
+                        tint = if (shuffleOn) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (p.radioFromFavorites) 0.38f else 1f),
+                    )
+                }
+            } else IconButton(onClick = { p.cycleMode() }) { PlayModeIcon(p.mode) }
             IconButton(onClick = { p.previous() }) {
                 Icon(Icons.Filled.SkipPrevious, contentDescription = if (radio) "Önceki radyo" else "Önceki", modifier = Modifier.size(36.dp))
             }
@@ -695,6 +710,8 @@ fun NowPlayingScreen(nav: Nav) {
             IconButton(onClick = { p.next() }) {
                 Icon(Icons.Filled.SkipNext, contentDescription = if (radio) "Sonraki radyo" else "Sonraki", modifier = Modifier.size(36.dp))
             }
+            // Radyoda tekrar düğmesi yok; çal düğmesi ortada kalsın
+            if (radio) Spacer(Modifier.size(48.dp))
             if (!radio) IconButton(onClick = { p.cycleRepeat() }) {
                 val r = p.repeat
                 Icon(
@@ -709,13 +726,24 @@ fun NowPlayingScreen(nav: Nav) {
                 )
             }
         }
-        if (radio) {
-            // Rastgele geçiş düğmesi kontrollerin altında: önceki / çal / sonraki ortada kalsın
-            FilterChip(
-                selected = p.radioShuffle,
-                onClick = { p.toggleRadioShuffle() },
-                leadingIcon = { Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                label = { Text(if (p.radioShuffle) "Rastgele radyo açık" else "Rastgele radyo") },
+        if (radio && p.radioShuffle) {
+            // Rastgele açıkken hangi radyolar arasında gezileceği
+            val pools = listOf("tr" to "Türk", "world" to "Yabancı", "mix" to "Karışık")
+            SingleChoiceSegmentedButtonRow(Modifier.padding(horizontal = 32.dp)) {
+                pools.forEachIndexed { i, (key, label) ->
+                    SegmentedButton(
+                        selected = p.radioPool == key,
+                        onClick = { p.changeRadioPool(key) },
+                        enabled = !p.radioFromFavorites,
+                        shape = SegmentedButtonDefaults.itemShape(i, pools.size),
+                    ) { Text(label, style = MaterialTheme.typography.labelMedium) }
+                }
+            }
+        }
+        if (radio && p.radioFromFavorites) {
+            Text(
+                "Favorilerden çalıyor", style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp),
             )
         }
         }

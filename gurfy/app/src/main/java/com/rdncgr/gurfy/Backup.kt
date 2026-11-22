@@ -59,7 +59,7 @@ object Backup {
      * duruyor): geri yüklemeden sonra bir kez "Last.fm'e bağlan" denir.
      */
     private val keys = setOf(
-        "lastfmUser", "listenbrainzUser", "lfmApiKey", "crossfadeSec", "playMode", "repeatMode", "radioShuffle",
+        "lastfmUser", "listenbrainzUser", "lfmApiKey", "crossfadeSec", "playMode", "repeatMode", "radioShuffle", "radioPool",
         "homeOrder", "homeHidden", "searchHistory", "heard", "skips",
     )
 

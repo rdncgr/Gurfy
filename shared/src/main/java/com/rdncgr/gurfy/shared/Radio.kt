@@ -24,10 +24,13 @@ import coil.compose.AsyncImage
 
 // Radyolar: Navidrome'daki internet radyoları ("Radyolarım") + sunucuda saklanan güncel Türkiye radyoları.
 
-/** Radyoyu, içinde bulunduğu listeyle birlikte çalar: ileri/geri düğmeleri bu listede gezinir. */
-fun playRadio(list: List<RadioStation>, r: RadioStation) {
+/**
+ * Radyoyu, içinde bulunduğu listeyle birlikte çalar: ileri/geri düğmeleri bu listede gezinir.
+ * [favorites]: favoriler (Radyolarım) listesinden açıldı; rastgele radyo bu sırada kapalıdır.
+ */
+fun playRadio(list: List<RadioStation>, r: RadioStation, favorites: Boolean = false) {
     val i = list.indexOf(r).coerceAtLeast(0)
-    Graph.player.play(list.map { it.asSong() }, i)
+    Graph.player.playRadios(list.map { it.asSong() }, i, favorites)
 }
 
 @Composable
@@ -57,7 +60,7 @@ fun RadioStrip(nav: Nav) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(list) { r ->
-                Column(Modifier.width(96.dp).clickable { playRadio(list, r) }) {
+                Column(Modifier.width(96.dp).clickable { playRadio(list, r, favorites = true) }) {
                     RadioLogo(r, 96.dp)
                     Text(
                         r.name, maxLines = 2, overflow = TextOverflow.Ellipsis,

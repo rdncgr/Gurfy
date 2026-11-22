@@ -210,6 +210,10 @@ class Settings(ctx: Context) {
     var radioShuffle: Boolean
         get() = prefs.getBoolean("radioShuffle", false)
         set(v) = prefs.edit().putBoolean("radioShuffle", v).apply()
+    /** Rastgele radyonun havuzu: "tr", "world" ya da "mix". */
+    var radioPool: String
+        get() = prefs.getString("radioPool", "mix") ?: "mix"
+        set(v) = prefs.edit().putString("radioPool", v).apply()
 
     /** Sunucu indirme listesinin son hali (servise ulaşılamazsa da görünsün). */
     var jobsJson: String

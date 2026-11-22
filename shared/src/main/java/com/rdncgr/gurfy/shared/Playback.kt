@@ -417,13 +417,13 @@ class PlayerController(private val ctx: Context) {
         }
         val list = queue
         withController { c ->
-            c.shuffleModeEnabled =
-                if (list[0].isRadio) radioShuffle else shuffled || mode == PlayMode.SHUFFLE
+            c.shuffleModeEnabled = if (list[0].isRadio) false else shuffled || mode == PlayMode.SHUFFLE
             c.repeatMode = if (list[0].isRadio) Player.REPEAT_MODE_OFF else repeat
             c.setMediaItems(list.map(::toItem), index, 0L)
             c.prepare()
             c.play()
             maybeExtend(c)
+            if (list[0].isRadio && radioShuffle && !radioFromFavorites) rebuildRadioQueue()
         }
     }
 
@@ -451,9 +451,95 @@ class PlayerController(private val ctx: Context) {
         private set
 
     fun toggleRadioShuffle() {
+        if (radioFromFavorites) return
         radioShuffle = !radioShuffle
         Graph.settings.radioShuffle = radioShuffle
-        if (current?.isRadio == true) controller?.shuffleModeEnabled = radioShuffle
+        rebuildRadioQueue()
+    }
+
+    /** Rastgele radyonun havuzu: "tr" = Türk, "world" = yabancı, "mix" = ikisi birlikte (kalıcı ayar). */
+    var radioPool by mutableStateOf(Graph.settings.radioPool)
+        private set
+
+    fun changeRadioPool(pool: String) {
+        if (radioFromFavorites || pool == radioPool) return
+        radioPool = pool
+        Graph.settings.radioPool = pool
+        if (radioShuffle) rebuildRadioQueue()
+    }
+
+    /** Radyo favorilerden açıldıysa rastgele kapalıdır; ileri / geri yalnızca favorilerde gezer. */
+    var radioFromFavorites by mutableStateOf(false)
+        private set
+
+    /** Radyonun açıldığı liste: rastgele kapalıyken ileri / geri bu listede sırayla gezer. */
+    private var radioList: List<Song> = emptyList()
+    private var poolJob: kotlinx.coroutines.Job? = null
+
+    fun playRadios(list: List<Song>, start: Int, favorites: Boolean) {
+        radioList = list
+        radioFromFavorites = favorites
+        play(list, start)
+    }
+
+    /**
+     * Çalan radyoyu kesmeden sıranın geri kalanını değiştirir:
+     * rastgele açıksa seçili havuzun karışık hali, kapalıysa radyonun açıldığı liste.
+     */
+    private fun rebuildRadioQueue() {
+        val cur = current ?: return
+        if (!cur.isRadio) return
+        poolJob?.cancel()
+        if (!radioShuffle || radioFromFavorites) {
+            replaceAround(cur, radioList)
+            return
+        }
+        val pool = radioPool
+        poolJob = Graph.scope.launch {
+            val songs = try {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { loadRadioPool(pool) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                emptyList()
+            }
+            val now = current
+            if (now?.isRadio != true || !radioShuffle || radioFromFavorites) return@launch
+            if (songs.isEmpty()) {
+                // Sunucu listesi gelmediyse radyonun açıldığı listede rastgele gez
+                replaceAround(now, radioList)
+                controller?.shuffleModeEnabled = true
+            } else {
+                replaceAround(now, songs.shuffled())
+            }
+        }
+    }
+
+    private fun loadRadioPool(pool: String): List<Song> {
+        if (!Graph.settings.serviceConfigured) return emptyList()
+        val list = when (pool) {
+            "tr" -> Graph.service.radios(scope = "tr")
+            "world" -> Graph.service.radios(scope = "world")
+            else -> Graph.service.radios(scope = "tr") + Graph.service.radios(scope = "world")
+        }
+        return list.distinctBy { urlKey(it.url) }.map { it.asSong() }
+    }
+
+    private fun replaceAround(cur: Song, list: List<Song>) {
+        val c = controller ?: return
+        val key = urlKey(cur.streamUrl.orEmpty())
+        val pos = list.indexOfFirst { urlKey(it.streamUrl.orEmpty()) == key }.coerceAtLeast(0)
+        val others = list.filter { urlKey(it.streamUrl.orEmpty()) != key }
+        val before = others.take(pos)
+        val after = others.drop(pos)
+        val i = c.currentMediaItemIndex
+        c.shuffleModeEnabled = false
+        if (i + 1 < c.mediaItemCount) c.removeMediaItems(i + 1, c.mediaItemCount)
+        if (i > 0) c.removeMediaItems(0, i)
+        if (after.isNotEmpty()) c.addMediaItems(after.map(::toItem))
+        if (before.isNotEmpty()) c.addMediaItems(0, before.map(::toItem))
+        queue = before + cur + after
+        index = before.size
     }
 
     // Radyoda listenin sonundan başa (ve tersi) döner

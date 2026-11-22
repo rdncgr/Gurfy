@@ -643,7 +643,7 @@ fun SearchContent(nav: Nav) {
                 LazyColumn(Modifier.fillMaxSize()) {
                     if (radioHits.isNotEmpty()) item { SectionTitle("Radyolar") }
                     items(radioHits, key = { "r" + (it.id ?: it.url) }) { st ->
-                        RadioRow(st, onPlay = { saveHistory(submitted); playRadio(radioHits, st) })
+                        RadioRow(st, onPlay = { saveHistory(submitted); playRadio(radioHits, st, favorites = true) })
                     }
                     if (r.artists.isEmpty() && r.albums.isEmpty() && r.songs.isEmpty() && radioHits.isEmpty()) {
                         item { EmptyNote("Kütüphanede bulunamadı.") }
