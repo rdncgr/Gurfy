@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-// Türler: Navidrome dosyalardaki tür etiketini okur. Türü olmayan şarkılara Nota servisi
+// Türler: Navidrome dosyalardaki tür etiketini okur. Türü olmayan şarkılara Gurfy servisi
 // Last.fm etiketlerinden tür yazabilir ("Tür ekle").
 
 private val tilePalette = listOf(

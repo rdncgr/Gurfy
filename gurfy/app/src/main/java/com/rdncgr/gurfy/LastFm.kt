@@ -371,7 +371,7 @@ object Lfm {
 
     // --------------------------------------------------------------- ListenBrainz
 
-    private const val LB_UA = "Gurfy/1.0 ( https://github.com/rdncgr/Nota )"
+    private const val LB_UA = "Gurfy/1.0 ( https://github.com/rdncgr/Gurfy )"
     private const val LB_ALGO = "session_based_days_7500_session_300_contribution_5_threshold_10_limit_100_filter_True_skip_30"
     private val mbidFile get() = File(Graph.appContext.filesDir, "mbid.json")
     private var mbids: JSONObject? = null

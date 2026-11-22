@@ -1,14 +1,18 @@
 # ZimaOS > Uygulama Mağazası > "Özelleştirilmiş Uygulama Yükle" > "İçe aktar" ile yapıştırın.
 #
 # ÖNCE: app.py dosyasını ZimaOS "Dosyalar" uygulamasıyla şu klasöre yükleyin:
-#   /DATA/AppData/nota-servis/app.py
+#   /DATA/AppData/gurfy-servis/app.py
+#
+# Eskiden "nota-servis" adıyla kurduysanız: eski uygulamayı ZimaOS'ta durdurup kaldırın,
+# /DATA/AppData/nota-servis klasörünün adını gurfy-servis yapın (indirme kuyruğu, ayar yedeği ve
+# önbellekler içindedir), yeni app.py'yi içine koyun ve bu YAML'ı içe aktarın.
 #
 # SONRA aşağıda "DEĞİŞTİR" yazan satırları kendinize göre düzenleyin.
-name: nota-servis
+name: gurfy-servis
 services:
-  nota-servis:
+  gurfy-servis:
     image: python:3.12-slim
-    container_name: nota-servis
+    container_name: gurfy-servis
     restart: unless-stopped
     # Her açılışta ffmpeg ve güncel yt-dlp kurulur (YouTube sık değiştiği için güncel kalması önemli).
     # İlk açılış 1-2 dakika sürebilir.
@@ -30,7 +34,7 @@ services:
       # SPOTIFY_CLIENT_ID: ""
       # SPOTIFY_CLIENT_SECRET: ""
     volumes:
-      - /DATA/AppData/nota-servis:/app
+      - /DATA/AppData/gurfy-servis:/app
       # DEĞİŞTİR: sol taraf Navidrome'un müzik klasörüyle AYNI olmalı
       # (Navidrome uygulama ayarlarında /music karşısında yazan yol). Fotoğraf diskine dokunmaz.
       - /DATA/Media/Music:/music
@@ -47,13 +51,13 @@ services:
     ports:
       - "4416:4416"
 x-casaos:
-  main: nota-servis
+  main: gurfy-servis
   port_map: "8099"
   scheme: http
   index: /
   title:
     custom: Gurfy Servis
-  icon: https://raw.githubusercontent.com/rdncgr/Nota/main/docs/icon.png
+  icon: https://raw.githubusercontent.com/rdncgr/Gurfy/main/docs/icon.png
   tagline:
     en_us: Gurfy Sync müzik uygulamasının sunucu servisi
     custom: Gurfy Sync müzik uygulamasının sunucu servisi

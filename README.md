@@ -85,7 +85,9 @@ Telefon "bilinmeyen kaynak" izni isterse ver. Yeni sürümler eskisinin üzerine
 ayarların ve indirdiklerin silinmez.
 
 ### 2. Gurfy servisini kur (isteğe bağlı ama önerilir)
-1. Sunucuda `nota-servis` adında bir klasör aç ve [`server/app.py`](server/app.py) dosyasını içine koy.
+1. Sunucuda `gurfy-servis` adında bir klasör aç (ZimaOS'ta `/DATA/AppData/gurfy-servis`) ve
+   [`server/app.py`](server/app.py) dosyasını içine koy. Eskiden `nota-servis` adıyla kurduysan YAML'ın
+   başındaki taşıma adımlarına bak.
 2. [`server/zimaos-app.yaml`](server/zimaos-app.yaml) dosyasındaki **DEĞİŞTİR** yazan satırları doldur:
    servis parolası (`API_KEY`, kendin belirlersin), Last.fm anahtarı, Navidrome kullanıcı adı ve parolası, müzik klasörü.
    Müzik klasörü Navidrome'unkiyle **aynı** olmalı.

@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// Şarkının türünü elle ekleme / değiştirme. Tür, Nota servisi tarafından dosyanın etiketine yazılır
+// Şarkının türünü elle ekleme / değiştirme. Tür, Gurfy servisi tarafından dosyanın etiketine yazılır
 // ve Navidrome taratılır; yeni tür tarama bitince kütüphanede görünür.
 
 /** Navidrome bazen birden fazla türü "Pop; Rock" gibi birleştirir. */

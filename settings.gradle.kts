@@ -13,7 +13,7 @@ dependencyResolutionManagement {
         maven("https://jitpack.io") // NewPipeExtractor (yalnızca Gurfy)
     }
 }
-rootProject.name = "Nota"
+rootProject.name = "Gurfy"
 
 // Ortak arayüz: ekranlar, oynatıcı, modeller. İki uygulama da bunu kullanır.
 include(":shared")

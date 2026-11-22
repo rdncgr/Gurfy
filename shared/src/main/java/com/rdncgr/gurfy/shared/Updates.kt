@@ -35,7 +35,7 @@ import org.json.JSONArray
 import java.util.concurrent.TimeUnit
 
 /** Uygulamaların yayınlandığı GitHub deposu (sürümler). */
-const val GITHUB_REPO = "rdncgr/Nota"
+const val GITHUB_REPO = "rdncgr/Gurfy"
 
 /**
  * Güncelleme denetimi. Uygulamalar Play Store'dan gelmediği için kendiliğinden güncellenmez:
@@ -144,7 +144,7 @@ fun openUrl(ctx: Context, url: String) {
     }
 }
 
-/** Açılışta denetler; yeni sürüm varsa sorar. NotaApp'te bir kez çağrılır. */
+/** Açılışta denetler; yeni sürüm varsa sorar. GurfyRoot'ta bir kez çağrılır. */
 @Composable
 fun UpdateDialog() {
     val ctx = LocalContext.current

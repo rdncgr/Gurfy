@@ -214,7 +214,7 @@ def navidrome(endpoint: str, **params):
         return None
     salt = secrets.token_hex(6)
     token = hashlib.md5((NAVIDROME_PASS + salt).encode()).hexdigest()
-    q = {"u": NAVIDROME_USER, "t": token, "s": salt, "v": "1.16.1", "c": "nota-servis", "f": "json"}
+    q = {"u": NAVIDROME_USER, "t": token, "s": salt, "v": "1.16.1", "c": "gurfy-servis", "f": "json"}
     q.update(params)
     r = requests.get(f"{NAVIDROME_URL}/rest/{endpoint}", params=q, timeout=15)
     r.raise_for_status()
@@ -275,7 +275,7 @@ def as_list(x):
 # Benzer sanatçılarda Last.fm'e ikinci kaynak, kişisel haftalık keşif listesi.
 # Okuma için anahtar gerekmez; yalnızca kullanıcı adı. Sanatçılar MusicBrainz kimliğiyle (MBID) tanınır.
 
-LB_UA = {"User-Agent": "GurfyServis/1.0 ( https://github.com/rdncgr/Nota )", "Accept": "application/json"}
+LB_UA = {"User-Agent": "GurfyServis/1.0 ( https://github.com/rdncgr/Gurfy )", "Accept": "application/json"}
 LB_SIMILAR_ALGO = "session_based_days_7500_session_300_contribution_5_threshold_10_limit_100_filter_True_skip_30"
 MBID_CACHE = Path(os.getenv("MBID_CACHE", "/app/mbid.json"))
 _mb_lock = threading.Lock()
@@ -965,7 +965,7 @@ def spotify(req: SpotifyReq):
 
 # -------------------------------------------------------------------- önizleme
 
-PREVIEW_DIR = Path(os.getenv("PREVIEW_DIR", "/tmp/nota-onizleme"))
+PREVIEW_DIR = Path(os.getenv("PREVIEW_DIR", "/tmp/gurfy-onizleme"))
 PREVIEW_KEEP = 40
 _preview_locks = {}
 _preview_locks_guard = threading.Lock()
@@ -1174,7 +1174,7 @@ WATCH_FILE = Path(os.getenv("YOUTUBE_WATCH_FILE", "/app/youtube-durum.json"))
 WATCH_HOURS = float(os.getenv("YOUTUBE_WATCH_HOURS", "6"))
 WATCH_QUERY = os.getenv("YOUTUBE_WATCH_QUERY", "Tarkan Şımarık")
 GURFY_GRADLE_URL = os.getenv(
-    "GURFY_GRADLE_URL", "https://raw.githubusercontent.com/rdncgr/Nota/main/gurfy/app/build.gradle.kts")
+    "GURFY_GRADLE_URL", "https://raw.githubusercontent.com/rdncgr/Gurfy/main/gurfy/app/build.gradle.kts")
 _watch_lock = threading.Lock()
 
 
@@ -1801,7 +1801,7 @@ def record_clip(url: str, seconds: int = 10) -> Path:
     import subprocess
     import tempfile
 
-    out = Path(tempfile.gettempdir()) / f"nota-tani-{uuid.uuid4().hex}.wav"
+    out = Path(tempfile.gettempdir()) / f"gurfy-tani-{uuid.uuid4().hex}.wav"
     cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-user_agent", RADIO_UA,
            "-i", url, "-t", str(seconds), "-vn", "-ac", "1", "-ar", "44100", str(out)]
     try:

@@ -46,7 +46,7 @@ class Subsonic(private val s: Settings, private val cacheDir: File) : Library {
         val sb = StringBuilder(s.navidromeUrl).append("/rest/").append(endpoint)
         sb.append("?u=").append(enc(s.user))
         sb.append("&t=").append(md5(s.pass + salt)).append("&s=").append(salt)
-        sb.append("&v=1.16.1&c=nota&f=json")
+        sb.append("&v=1.16.1&c=gurfysync&f=json")
         for ((k, v) in params) sb.append('&').append(k).append('=').append(enc(v))
         return sb.toString()
     }
