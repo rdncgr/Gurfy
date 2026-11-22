@@ -35,6 +35,7 @@ import androidx.room.Room
 import com.rdncgr.gurfy.shared.Backend
 import com.rdncgr.gurfy.shared.EmptyNote
 import com.rdncgr.gurfy.shared.Graph
+import com.rdncgr.gurfy.shared.Guide
 import com.rdncgr.gurfy.shared.InfoTitle
 import com.rdncgr.gurfy.shared.Library
 import com.rdncgr.gurfy.shared.MusicService
@@ -217,8 +218,30 @@ private fun GurfyConnectionSettings() {
             InfoTitle(
                 "Last.fm",
                 "Benzer şarkılar, sana özel öneriler, türler, listeler ve istatistikler Last.fm ile çalışır. " +
-                    "last.fm/api/account/create adresinden ücretsiz anahtar al. Dinlemeleri hesabına göndermek için " +
+                    "Anahtar ücretsizdir; nasıl alınacağı aşağıda adım adım anlatılıyor. Dinlemeleri hesabına göndermek için " +
                     "gizli anahtarı da gir ve bir kez bağlan; parolan saklanmaz.",
+            )
+            Guide(
+                "Last.fm anahtarı nasıl alınır?",
+                listOf(
+                    "Last.fm hesabın yoksa [last.fm/join](https://www.last.fm/join) sayfasından ücretsiz hesap aç " +
+                        "(e-posta adresine gelen onay bağlantısına dokunmayı unutma). Hesabın varsa " +
+                        "[last.fm/login](https://www.last.fm/login) sayfasından giriş yap.",
+                    "Giriş yaptıktan sonra [last.fm/api/account/create](https://www.last.fm/api/account/create) sayfasını aç. " +
+                        "Bu sayfa bir form gösterir; İngilizcedir ama doldurması kolaydır.",
+                    "Formu şöyle doldur: **Contact email** e-posta adresin, **Application name** \"Gurfy\", " +
+                        "**Application description** \"Kişisel müzik uygulaması\". **Callback URL** ve " +
+                        "**Application homepage** boş kalabilir. Sonra **Submit** düğmesine dokun.",
+                    "Açılan sayfada iki uzun kod görürsün: **API key** ve **Shared secret**. API key'i uzun basıp kopyala, " +
+                        "aşağıdaki \"API anahtarı\" kutusuna yapıştır. Shared secret'ı da \"Gizli anahtar\" kutusuna yapıştır.",
+                    "\"Last.fm kullanıcı adı\" kutusuna Last.fm'deki kullanıcı adını yaz (e-posta değil; profil sayfanda, " +
+                        "last.fm/user/... adresinin sonunda yazan ad).",
+                    "Dinlediğin şarkıların Last.fm hesabına işlenmesini istiyorsan parolanı yazıp **Last.fm'e bağlan**'a dokun. " +
+                        "Parola yalnızca bir kez kullanılır, telefonda saklanmaz. Öneriler bu adım olmadan da çalışır.",
+                    "En alttaki **Kaydet ve sına**'ya dokun. Durum bölümünde Last.fm satırında yeşil işaret görüyorsan tamamdır.",
+                ),
+                footer = "Kodları kaybedersen [last.fm/api/accounts](https://www.last.fm/api/accounts) sayfasından yeniden görebilirsin. " +
+                    "Öneriler dinleme geçmişinden çıkar; hesabın yeniyse birkaç gün dinledikten sonra dolmaya başlar.",
             )
             OutlinedTextField(key, { key = it }, singleLine = true, modifier = field, label = { Text("API anahtarı") })
             OutlinedTextField(
@@ -262,7 +285,18 @@ private fun GurfyConnectionSettings() {
         SettingsCard {
             InfoTitle(
                 "ListenBrainz (isteğe bağlı)",
-                "Haftalık keşif listen Sana özel önerilere karışır; kullanıcı adı yeterli.",
+                "Haftalık keşif listen Sana özel önerilere karışır; anahtar gerekmez, kullanıcı adı yeterli.",
+            )
+            Guide(
+                "ListenBrainz hesabı nasıl açılır?",
+                listOf(
+                    "[listenbrainz.org](https://listenbrainz.org) sitesini aç ve sağ üstteki **Sign in**'e dokun. Hesabın yoksa " +
+                        "açılan MetaBrainz sayfasında **Create account** ile ücretsiz hesap aç.",
+                    "ListenBrainz keşif listesini senin dinlediklerinden hazırlar. Last.fm kullanıyorsan geçmişini aktarmak için " +
+                        "[Music services](https://listenbrainz.org/settings/music-services/details/) sayfasında Last.fm'i bağla.",
+                    "Aşağıdaki kutuya ListenBrainz kullanıcı adını yaz ve **Kaydet ve sına**'ya dokun.",
+                ),
+                footer = "Haftalık keşif listesi yeterince dinleme biriktikten sonra, genellikle pazartesileri hazırlanır.",
             )
             OutlinedTextField(
                 lbUser, { lbUser = it }, singleLine = true, modifier = field,

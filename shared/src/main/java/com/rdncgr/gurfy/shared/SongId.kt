@@ -129,7 +129,7 @@ object SongId {
         Graph.settings.heardJson = a.toString()
     }
 
-    private fun addHeard(r: Recognition) {
+    fun addHeard(r: Recognition) {
         load()
         val s = r.song ?: return
         heard.removeAll { it.song?.let(::keyOf) == keyOf(s) }

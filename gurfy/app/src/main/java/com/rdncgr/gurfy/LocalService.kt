@@ -246,7 +246,20 @@ class LocalService(private val ctx: Context) : MusicService {
         )
         return Recognition(suggestion(hit.artist, hit.title, hit.album), "shazam", hit.cover, station, null)
     }
+
+    override fun recognizeAudio(pcm: ShortArray, source: String): Recognition {
+        val hit = try {
+            ShazamApi.recognize(ShazamSignature.create(pcm.lastSamples(12 * ShazamSignature.RATE)), Local.http)
+        } catch (e: ShazamChanged) {
+            return Recognition(null, "shazam", null, source, "Şarkı tanıma servisi (Shazam) değişmiş olabilir: ${e.message}")
+        } catch (e: Exception) {
+            throw IOException("Tanıma servisine ulaşılamadı", e)
+        } ?: return Recognition(null, "shazam", null, source, "Şarkı tanınamadı. Ses daha yüksek ya da daha net olunca tekrar dene.")
+        return Recognition(suggestion(hit.artist, hit.title, hit.album), "shazam", hit.cover, source, null)
+    }
 }
+
+private fun ShortArray.lastSamples(n: Int): ShortArray = if (size <= n) this else copyOfRange(size - n, size)
 
 /** radio-browser.info'dan telefondan doğrudan alınan radyo listesi; günde bir yenilenir. */
 object Radios {

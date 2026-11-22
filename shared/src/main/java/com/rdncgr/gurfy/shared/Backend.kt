@@ -204,6 +204,9 @@ interface MusicService {
     /** Radyoda o an çalan şarkıyı bulur (önce yayın bilgisi, yoksa ses kaydı + Shazam). */
     fun recognize(url: String, station: String, forceAudio: Boolean, streamTitle: String? = null): Recognition
 
+    /** Telefonda kaydedilen sesten (16 kHz, tek kanal) şarkıyı bulur: şarkı bulma topu. */
+    fun recognizeAudio(pcm: ShortArray, source: String): Recognition
+
     /** "tr" = Türkiye, "world" = dünya en çok dinlenenler (Last.fm). */
     fun charts(scope: String): List<Suggestion>
 

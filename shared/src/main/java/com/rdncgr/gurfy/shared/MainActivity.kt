@@ -216,6 +216,17 @@ class MainActivity : ComponentActivity() {
         // Ayar açıksa ve son eşitlemenin üzerinden yeterli süre geçtiyse sık dinlenenleri indir
         AutoOffline.run()
     }
+
+    // Şarkı bulma topu uygulamanın kendi ekranlarında gizlenir (oynatıcı düğmelerini örtmesin)
+    override fun onStart() {
+        super.onStart()
+        ListenBubble.appVisible(true)
+    }
+
+    override fun onStop() {
+        ListenBubble.appVisible(false)
+        super.onStop()
+    }
 }
 
 private data class TabItem(val screen: Screen, val label: String, val icon: ImageVector)

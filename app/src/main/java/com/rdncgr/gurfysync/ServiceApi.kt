@@ -130,7 +130,17 @@ class ServiceApi(private val s: Settings) : MusicService {
     override fun recognize(url: String, station: String, forceAudio: Boolean, streamTitle: String?): Recognition {
         val req = JSONObject().put("url", url).put("name", station).put("force_audio", forceAudio)
         if (!streamTitle.isNullOrBlank()) req.put("stream_title", streamTitle) // çalar başlığı zaten okuduysa
-        val o = post("/recognize", req)
+        return recognition(post("/recognize", req), station)
+    }
+
+    /** Şarkı bulma topu: telefonda kaydedilen ses WAV olarak sunucuya gider, sunucu Shazam'a sorar. */
+    override fun recognizeAudio(pcm: ShortArray, source: String): Recognition {
+        val wav = Wav.encode(pcm, 16000)
+        val o = exec(Request.Builder().url(s.serviceUrl + "/recognize/audio").post(wav.toRequestBody("audio/wav".toMediaType())))
+        return recognition(o, source)
+    }
+
+    private fun recognition(o: JSONObject, station: String): Recognition {
         if (!o.optBoolean("found")) return Recognition(null, o.optString("source"), null, station,
             o.optString("message", "Şarkı tanınamadı"))
         val s = Suggestion(o.optString("artist"), o.optString("title"), o.strOrNull("album"), o.optBoolean("in_library"))

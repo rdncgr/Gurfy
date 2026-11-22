@@ -31,6 +31,7 @@ Gurfy servisinin işlerini telefon kendisi yapar. Müzik uygulama üzerinden ara
 | Last.fm / ListenBrainz: öneriler, istatistik, unuttukların, benzerler, türler | Telefondan doğrudan, aynı algoritma (`LastFm.kt`) |
 | Arama (Last.fm) | YouTube Music şarkı araması (anahtar gerekmez) |
 | Radyo listesi (radio-browser) | Telefondan doğrudan (`LocalService.kt` > `Radios`) |
+| Şarkı bulma topu (ses `/recognize/audio`'ya yüklenir, shazamio) | Aynı top; ses telefonda Kotlin Shazam imzasına çevrilir (`LocalService.recognizeAudio`) |
 | Radyoda şarkı tanıma (ffmpeg kaydı + shazamio) | Oynatıcının çıkışından ses kopyası + Kotlin Shazam imzası (`AudioTap.kt`, `Shazam.kt`) |
 | Spotify / YouTube listesi aktarma | Spotify embed sayfası ve NewPipe liste çözücü |
 | Navidrome'un Last.fm'e scrobble etmesi | Telefondan doğrudan Last.fm'e |

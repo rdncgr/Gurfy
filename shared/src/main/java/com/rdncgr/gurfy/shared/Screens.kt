@@ -346,6 +346,7 @@ fun HomeScreen(nav: Nav) {
 
     val page: @Composable () -> Unit = { Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Header(androidx.compose.ui.platform.LocalContext.current.let { it.applicationInfo.loadLabel(it.packageManager).toString() }, nav) {
+            ListenBubbleButton() // şarkı bulma topu (diğer uygulamaların üzerinde)
             IconButton(onClick = { nav.push(Screen.Downloads) }) {
                 Icon(Icons.Filled.Smartphone, contentDescription = "Telefondakiler")
             }

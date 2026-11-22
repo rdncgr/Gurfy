@@ -25,7 +25,7 @@ from typing import List, Optional
 from urllib.parse import quote
 
 import requests
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Body, Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -1874,6 +1874,32 @@ def recognize(req: RecognizeReq):
                 "message": "Şarkı tanınamadı. Konuşma ya da reklam olabilir; biraz sonra tekrar deneyin."}
     return {"found": True, "source": "shazam", **hit, "stream_title": raw,
             "in_library": in_library(hit["artist"], hit["title"])}
+
+
+@app.post("/recognize/audio", dependencies=[Depends(auth)])
+def recognize_audio(body: bytes = Body(..., media_type="audio/wav")):
+    """Şarkı bulma topu: telefonun kaydettiği sesi (WAV, ~10 sn) Shazam'a sorar.
+    Gurfy aynı işi telefonda kendi Kotlin Shazam istemcisiyle yapar."""
+    if len(body) < 16000 or len(body) > 8_000_000 or body[:4] != b"RIFF":
+        raise HTTPException(400, "Geçersiz ses kaydı")
+    try:
+        import shazamio  # noqa: F401
+    except ImportError:
+        raise HTTPException(500, "Sunucuda shazamio kurulu değil (pip install shazamio)")
+    import tempfile
+
+    clip = Path(tempfile.gettempdir()) / f"gurfy-tani-{uuid.uuid4().hex}.wav"
+    clip.write_bytes(body)
+    try:
+        hit = shazam(clip)
+    except Exception as e:
+        raise HTTPException(502, f"Tanıma servisine ulaşılamadı: {tr_error(e)}")
+    finally:
+        clip.unlink(missing_ok=True)
+    if not hit:
+        return {"found": False, "source": "shazam",
+                "message": "Şarkı tanınamadı. Ses daha yüksek ya da daha net olunca tekrar dene."}
+    return {"found": True, "source": "shazam", **hit, "in_library": in_library(hit["artist"], hit["title"])}
 
 
 # ----------------------------------------------------------------------- türler

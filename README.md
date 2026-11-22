@@ -42,6 +42,10 @@ radyoda duyduğun şarkıyı tanır ve tek dokunuşla arşivine ekler.
 - Favori radyolar, istasyonlar arasında ileri/geri geçiş, rastgele radyo
 - Yayında çalan şarkının adı ekranda
 - **Bu şarkı ne?** Radyoda çalan şarkıyı tanır, tek dokunuşla arşivine indirir.
+- **Şarkı bulma topu:** Ana sayfadaki kulak simgesi, diğer uygulamaların üzerinde duran bir top açar. Instagram ya da
+  başka bir uygulamada müzik çalarken topa dokununca ses mikrofondan 10 sn dinlenir (kulaklık takılıysa cihazın sesi),
+  sunucu Shazam'a sorar (`/recognize/audio`) ve şarkı tek dokunuşla indirilir. Top istenen yere sürüklenir,
+  alttaki X'e bırakılınca kapanır.
   Tanınan şarkılar "Radyoda duyduklarım" listesinde birikir.
 
 ### 🔍 Keşfet
