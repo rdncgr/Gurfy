@@ -12,6 +12,8 @@
     <!-- Telefonun kendi müziklerini "Telefondakiler" ekranında göstermek için -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Android 9 ve öncesinde telefonun müziklerini silebilmek için -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
     <application>
         <activity

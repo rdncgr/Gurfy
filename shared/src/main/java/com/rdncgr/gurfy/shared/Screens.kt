@@ -32,6 +32,8 @@ object Deleted {
 
 /** Şarkının dosyasını sunucudan siler; telefondaki kopyası ve çalma sırasındaki yeri de kalkar. */
 fun deleteFromServer(song: Song) {
+    // Gurfy'de "sunucu" telefonun kendisi: dosya Android'e sorularak silinir
+    if (!Graph.backend.hasRemoteLibrary) { PhoneDelete.delete(listOf(song)); return }
     Graph.io(then = {
         Deleted.ids[song.id] = true
         if (Graph.offline.downloaded.containsKey(song.id)) Graph.offline.delete(song.id)
@@ -67,7 +69,10 @@ fun SongRow(song: Song, nav: Nav, onRemove: (() -> Unit)? = null, onClick: () ->
     if (Deleted.ids[song.id] == true) return
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
-    if (confirmDelete) ServerDeleteDialog(song) { confirmDelete = false }
+    if (confirmDelete) {
+        if (song.isLocal) PhoneDeleteDialog("Şarkı silinsin mi?", 1, 0, { confirmDelete = false }) { PhoneDelete.delete(listOf(song)) }
+        else ServerDeleteDialog(song) { confirmDelete = false }
+    }
     var addToList by remember { mutableStateOf(false) }
     if (addToList) AddToPlaylistDialog(listOf(song)) { addToList = false }
     var editGenre by remember { mutableStateOf(false) }
@@ -102,17 +107,13 @@ fun SongRow(song: Song, nav: Nav, onRemove: (() -> Unit)? = null, onClick: () ->
         }
         if (busy) {
             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-        } else if (saved) {
-            Icon(
-                Icons.Filled.DownloadDone, contentDescription = "Telefonda kayıtlı",
-                tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp),
-            )
-        }
+        } else SourceIcon(song)
         Box {
             IconButton(onClick = { menu = true }) {
                 Icon(Icons.Filled.MoreVert, contentDescription = "Seçenekler")
             }
             if (song.isLocal) DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                // Yalnızca telefonda duran şarkı: Navidrome tanımadığı için beğeni / liste yok
                 DropdownMenuItem(
                     text = { Text("Benzerlerini bul") },
                     onClick = {
@@ -120,9 +121,25 @@ fun SongRow(song: Song, nav: Nav, onRemove: (() -> Unit)? = null, onClick: () ->
                         nav.push(Screen.Similar(song.artist, song.title))
                     },
                 )
+                song.albumId?.let { albumId ->
+                    DropdownMenuItem(
+                        text = { Text("Albüme git") },
+                        onClick = {
+                            menu = false
+                            nav.push(Screen.AlbumDetail(albumId))
+                        },
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text("Telefondan sil") },
+                    onClick = {
+                        menu = false
+                        confirmDelete = true
+                    },
+                )
             } else DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 if (Graph.backend.hasRemoteLibrary) DropdownMenuItem(
-                    text = { Text(if (saved) "Telefondan sil" else "Telefona indir") },
+                    text = { Text(if (saved) "Telefondan kaldır" else "Telefona indir") },
                     onClick = {
                         menu = false
                         if (saved) offline.delete(song.id) else Graph.saveOffline(song)
@@ -302,9 +319,18 @@ fun PlayModeIcon(mode: PlayMode, modifier: Modifier = Modifier) {
 fun HomeScreen(nav: Nav) {
     var refresh by remember { mutableIntStateOf(0) }
     var creating by remember { mutableStateOf(false) }
+    // Sunuculu sürümde ekranı aşağı çekmek yeniler; sunucusuz Gurfy'de yenilenecek bir şey yok
+    val remote = Graph.backend.hasRemoteLibrary
+    var pulling by remember { mutableStateOf(false) }
+    LaunchedEffect(pulling) {
+        if (pulling) {
+            kotlinx.coroutines.delay(1200)
+            pulling = false
+        }
+    }
     // Navidrome'a erişim: açılışta, yenilemede ve 30 sn'de bir denetlenir
     val serverOk by produceState<Boolean?>(null, refresh) {
-        while (true) {
+        while (remote) {
             value = withContext(Dispatchers.IO) {
                 try { Graph.subsonic.ping(); true } catch (e: Exception) { false }
             }
@@ -318,7 +344,7 @@ fun HomeScreen(nav: Nav) {
         }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+    val page: @Composable () -> Unit = { Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Header(androidx.compose.ui.platform.LocalContext.current.let { it.applicationInfo.loadLabel(it.packageManager).toString() }, nav) {
             IconButton(onClick = { nav.push(Screen.Downloads) }) {
                 Icon(Icons.Filled.Smartphone, contentDescription = "Telefondakiler")
@@ -326,19 +352,34 @@ fun HomeScreen(nav: Nav) {
             IconButton(onClick = { creating = true }) {
                 Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Yeni liste")
             }
-            // Sunucuya ulaşılamıyorsa yenile düğmesi kırmızı X olur (dokununca yeniden dener)
-            IconButton(onClick = { refresh++ }) {
-                if (serverOk == false) Icon(
+            // Sunucuya ulaşılamıyorsa kırmızı X görünür (dokununca yeniden dener)
+            if (remote && serverOk == false) IconButton(onClick = { refresh++ }) {
+                Icon(
                     Icons.Filled.Close, contentDescription = "Sunucuya ulaşılamıyor, yeniden dene",
                     tint = MaterialTheme.colorScheme.error,
-                ) else Icon(Icons.Filled.Refresh, contentDescription = "Yenile")
+                )
+            }
+            // Radyo: en son çalan radyoyu açar; radyo çalıyorsa duraklatır / sürdürür
+            val radioOn = Graph.player.current?.isRadio == true && Graph.player.playing
+            IconButton(onClick = { Graph.player.playLastRadio() }) {
+                Icon(
+                    Icons.Filled.Radio, contentDescription = if (radioOn) "Radyoyu duraklat" else "Radyo çal",
+                    tint = if (radioOn) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                )
             }
         }
         HomeLayout.sections.filter { it.visible }.forEach { sec ->
             key(sec.key) { HomeSectionView(sec, nav, refresh) }
         }
         Spacer(Modifier.height(24.dp))
-    }
+    } }
+    if (remote) {
+        androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+            isRefreshing = pulling,
+            onRefresh = { pulling = true; refresh++ },
+            modifier = Modifier.fillMaxSize(),
+        ) { page() }
+    } else page()
 }
 
 @Composable
@@ -632,7 +673,7 @@ fun SearchContent(nav: Nav) {
             }
         } else {
             val result by load("search", submitted) { Graph.subsonic.search(submitted) }
-            // Kütüphanede olmayan, sunucuya indirilebilecek şarkılar (Nota servisi / Last.fm)
+            // Kütüphanede olmayan, sunucuya indirilebilecek şarkılar (Gurfy servisi / Last.fm)
             val online by load("search-online", submitted) {
                 if (Graph.settings.serviceConfigured) Graph.service.search(submitted).filter { !it.inLibrary } else emptyList()
             }

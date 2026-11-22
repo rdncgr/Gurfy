@@ -22,7 +22,11 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
+import android.os.Bundle
+import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaController
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionToken
@@ -96,7 +100,10 @@ class PlaybackService : MediaSessionService() {
                     if (e is IcyInfo) LiveMeta.update(e.title)
                 }
             }
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) { LiveMeta.update(null) }
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                LiveMeta.update(null)
+                updateLayout()
+            }
         })
         crossfader = Crossfader(this, player).also { it.start() }
         session = MediaSession.Builder(this, player)
@@ -113,8 +120,61 @@ class PlaybackService : MediaSessionService() {
                     }.toMutableList()
                     return Futures.immediateFuture(fixed)
                 }
+
+                override fun onConnect(
+                    session: MediaSession,
+                    controller: MediaSession.ControllerInfo,
+                ): MediaSession.ConnectionResult {
+                    val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+                        .add(identifyCommand).build()
+                    return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                        .setAvailableSessionCommands(commands)
+                        .build()
+                }
+
+                // Bildirimdeki "indir" düğmesi: radyoda çalan şarkıyı tanır ve doğrudan indirmeye gönderir
+                override fun onCustomCommand(
+                    session: MediaSession,
+                    controller: MediaSession.ControllerInfo,
+                    customCommand: SessionCommand,
+                    args: Bundle,
+                ): ListenableFuture<SessionResult> {
+                    if (customCommand.customAction != identifyCommand.customAction) {
+                        return super.onCustomCommand(session, controller, customCommand, args)
+                    }
+                    val item = session.player.currentMediaItem
+                    val url = item?.localConfiguration?.uri?.toString() ?: item?.requestMetadata?.mediaUri?.toString()
+                    if (item != null && item.mediaId.startsWith("radio:") && url != null) {
+                        SongId.identifyAndDownload(
+                            Song(
+                                id = item.mediaId, title = item.mediaMetadata.title?.toString() ?: "Radyo",
+                                artist = "Canlı radyo", album = "Radyo", albumId = null, coverArt = null,
+                                duration = 0, streamUrl = url,
+                            ),
+                        )
+                    }
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
             })
             .build()
+        updateLayout()
+    }
+
+    private val identifyCommand = SessionCommand("gurfy.radyo.indir", Bundle.EMPTY)
+
+    /** Bildirimde yalnızca radyo çalarken "indir" düğmesi görünür. */
+    private fun updateLayout() {
+        val s = session ?: return
+        val radio = s.player.currentMediaItem?.mediaId?.startsWith("radio:") == true
+        s.setCustomLayout(
+            if (radio) listOf(
+                CommandButton.Builder()
+                    .setDisplayName("Çalan şarkıyı indir")
+                    .setIconResId(R.drawable.ic_radyo_indir)
+                    .setSessionCommand(identifyCommand)
+                    .build(),
+            ) else emptyList(),
+        )
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
@@ -329,6 +389,7 @@ class PlayerController(private val ctx: Context) {
                     override fun onEvents(player: Player, events: Player.Events) {
                         playing = player.isPlaying
                         if (player.mediaItemCount > 0) index = player.currentMediaItemIndex
+                        rememberRadio()
                     }
 
                     // Bağlantı koptuysa susmak yerine sıradaki telefonda kayıtlı şarkıya geç
@@ -475,6 +536,55 @@ class PlayerController(private val ctx: Context) {
     /** Radyonun açıldığı liste: rastgele kapalıyken ileri / geri bu listede sırayla gezer. */
     private var radioList: List<Song> = emptyList()
     private var poolJob: kotlinx.coroutines.Job? = null
+
+    private var lastRadioUrl: String? = null
+
+    private fun rememberRadio() {
+        val s = current ?: return
+        val url = s.streamUrl ?: return
+        if (url == lastRadioUrl) return
+        lastRadioUrl = url
+        Graph.settings.lastRadio = org.json.JSONObject()
+            .put("name", s.title).put("url", url).put("favicon", s.logo ?: "").put("fav", radioFromFavorites)
+            .toString()
+    }
+
+    /**
+     * Ana sayfadaki radyo düğmesi: radyo çalıyorsa duraklatır / sürdürür; yoksa en son çalan radyoyu
+     * açtığı listeyle birlikte başlatır. Hiç radyo çalınmadıysa favorilerin (yoksa Türk radyolarının) ilki çalar.
+     */
+    fun playLastRadio() {
+        if (current?.isRadio == true) { toggle(); return }
+        val last = try {
+            org.json.JSONObject(Graph.settings.lastRadio).takeIf { it.optString("url").isNotBlank() }
+        } catch (e: Exception) { null }
+        Graph.scope.launch {
+            try {
+                val favs = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    try { Graph.subsonic.radios() } catch (e: Exception) { emptyList() }
+                }
+                val wantFav = last?.optBoolean("fav") ?: true
+                val useFav = wantFav && favs.isNotEmpty() || !Graph.settings.serviceConfigured
+                val list = if (useFav) favs else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    Graph.service.radios(scope = "tr")
+                }
+                var stations = list
+                var station = last?.let { o -> list.firstOrNull { urlKey(it.url) == urlKey(o.optString("url")) } }
+                if (station == null && last != null) {
+                    station = RadioStation(null, last.optString("name"), last.optString("url"), favicon = last.optString("favicon"))
+                    stations = listOf(station) + list
+                }
+                val start = station ?: stations.firstOrNull()
+                if (start == null) {
+                    Graph.toast("Henüz radyo yok. Kütüphane > Radyo'dan ekleyebilirsin.")
+                    return@launch
+                }
+                playRadio(stations, start, favorites = useFav)
+            } catch (e: Exception) {
+                Graph.toast(errorText(e, "Radyo açılamadı"))
+            }
+        }
+    }
 
     fun playRadios(list: List<Song>, start: Int, favorites: Boolean) {
         radioList = list

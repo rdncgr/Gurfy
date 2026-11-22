@@ -227,6 +227,15 @@ class LocalLibrary(private val ctx: Context, private val db: GurfyDb) : Library 
         invalidate()
     }
 
+    override fun phoneUri(song: Song): String? = MediaFiles.uriOf(song.id)?.toString()
+
+    override fun phoneDeleted(ids: List<String>) {
+        ids.forEach { db.songs().delete(it); db.playlists().removeSongEverywhere(it) }
+        invalidate()
+    }
+
+    override fun phoneAccessChanged() = sync()
+
     fun remove(id: String) {
         db.songs().delete(id)
         db.playlists().removeSongEverywhere(id)
@@ -242,7 +251,7 @@ class LocalLibrary(private val ctx: Context, private val db: GurfyDb) : Library 
     fun all(): List<SongRow> = rows()
 
     /**
-     * Müzik/Gurfy klasörüyle veritabanını uzlaştırır: klasörde olup veritabanında olmayanlar eklenir
+     * Telefonun müzikleriyle (Müzik/Gurfy ve izin varsa diğerleri) veritabanını uzlaştırır: klasörde olup veritabanında olmayanlar eklenir
      * (yeniden kurulum, bilgisayardan kopyalananlar), dosyası silinmiş olanlar çıkarılır.
      */
     fun sync() {

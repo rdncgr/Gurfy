@@ -210,6 +210,11 @@ class Settings(ctx: Context) {
     var radioShuffle: Boolean
         get() = prefs.getBoolean("radioShuffle", false)
         set(v) = prefs.edit().putBoolean("radioShuffle", v).apply()
+    /** En son çalan radyo (JSON: name, url, favicon, fav). Ana sayfadaki radyo düğmesi bunu açar. */
+    var lastRadio: String
+        get() = prefs.getString("lastRadio", "") ?: ""
+        set(v) = prefs.edit().putString("lastRadio", v).apply()
+
     /** Rastgele radyonun havuzu: "tr", "world" ya da "mix". */
     var radioPool: String
         get() = prefs.getString("radioPool", "mix") ?: "mix"

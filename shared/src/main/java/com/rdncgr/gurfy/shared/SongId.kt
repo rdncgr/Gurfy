@@ -26,7 +26,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// "Bu şarkı ne?": radyoda çalan şarkıyı Nota servisi bulur (yayın bilgisi ya da 10 sn kayıt + Shazam).
+// "Bu şarkı ne?": radyoda çalan şarkıyı Gurfy servisi bulur (yayın bilgisi ya da 10 sn kayıt + Shazam).
 // Tanınan şarkılar "Radyoda duyduklarım" listesinde saklanır; oradan tek tek ya da topluca indirilir.
 
 object SongId {
@@ -48,7 +48,29 @@ object SongId {
 
     fun keyOf(s: Suggestion) = s.artist.lowercase() + "|" + s.title.lowercase()
 
-    fun identify(song: Song, forceAudio: Boolean = false) {
+    /**
+     * Bildirimdeki kısayol: radyoda çalan şarkıyı tanır, sonucun doğruluğuna bakmadan indirmeye gönderir.
+     */
+    fun identifyAndDownload(song: Song) {
+        if (song.streamUrl == null) return
+        if (busy) { Graph.toast("Şarkı zaten tanınıyor, biraz bekle"); return }
+        if (!Graph.settings.serviceConfigured) { Graph.toast("Önce Ayarlar'dan Gurfy servis adresini girin"); return }
+        Graph.toast("Çalan şarkı tanınıyor…")
+        identify(song) { r ->
+            val s = r.song
+            when {
+                s == null -> Graph.toast(r.message ?: "Şarkı tanınamadı")
+                s.inLibrary -> Graph.toast("Zaten arşivde: ${s.artist} – ${s.title}")
+                queued[keyOf(s)] == true -> Graph.toast("Zaten sırada: ${s.artist} – ${s.title}")
+                else -> {
+                    download(listOf(s))
+                    Graph.toast("İndiriliyor: ${s.artist} – ${s.title}")
+                }
+            }
+        }
+    }
+
+    fun identify(song: Song, forceAudio: Boolean = false, onDone: ((Recognition) -> Unit)? = null) {
         val url = song.streamUrl ?: return
         if (busy) return
         if (!Graph.settings.serviceConfigured) { Graph.toast("Önce Ayarlar'dan Gurfy servis adresini girin"); return }
@@ -73,6 +95,7 @@ object SongId {
                 busy = false
                 listening = false
             }
+            result?.let { onDone?.invoke(it) }
         }
     }
 

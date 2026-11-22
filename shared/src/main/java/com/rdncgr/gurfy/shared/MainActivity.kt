@@ -202,7 +202,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme(colorScheme = appColors(Graph.backend.accent)) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    NotaApp()
+                    GurfyRoot()
                 }
             }
         }
@@ -221,7 +221,7 @@ class MainActivity : ComponentActivity() {
 private data class TabItem(val screen: Screen, val label: String, val icon: ImageVector)
 
 @Composable
-fun NotaApp() {
+fun GurfyRoot() {
     val nav = remember { Nav(if (Graph.settings.configured) Screen.Home else Screen.SettingsScreen) }
     BackHandler(enabled = nav.stack.size > 1) { nav.pop() }
 
@@ -236,6 +236,7 @@ fun NotaApp() {
     val top = nav.top
     UpdateDialog()
     Graph.backend.Overlay()
+    PhoneDeleteHost()
 
     Scaffold(
         bottomBar = {

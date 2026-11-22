@@ -63,7 +63,7 @@ object MediaFiles {
     )
 
     /**
-     * Müzik/Gurfy klasöründeki şarkılar. Gurfy'nin kendi yazdıkları her zaman görünür;
+     * Müzik/Gurfy klasöründeki ve (izin varsa) telefondaki bütün şarkılar. Gurfy'nin kendi yazdıkları her zaman görünür;
      * yeniden kurulumdan önce yazılanlar ve bilgisayardan kopyalananlar için "Müzik ve ses" izni gerekir.
      */
     fun scan(ctx: Context): List<Scanned> {
@@ -74,10 +74,13 @@ object MediaFiles {
         )
         if (Build.VERSION.SDK_INT >= 30) cols += MediaStore.Audio.Media.GENRE
         val out = mutableListOf<Scanned>()
+        // Gurfy'nin kendi klasörü her zaman; izin varsa telefondaki bütün müzikler (ses kayıtları,
+        // zil sesleri ve kısa kayıtlar hariç: PhoneMusic.selection)
+        val (music, musicArgs) = com.rdncgr.gurfy.shared.PhoneMusic.selection()
         ctx.contentResolver.query(
             collection, cols.toTypedArray(),
-            "${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ? AND ${MediaStore.Audio.Media.IS_PENDING} = 0",
-            arrayOf("$ROOT%"), null,
+            "${MediaStore.Audio.Media.IS_PENDING} = 0 AND (${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ? OR ($music))",
+            arrayOf("$ROOT%") + musicArgs, null,
         )?.use { c ->
             while (c.moveToNext()) {
                 val unknown = MediaStore.UNKNOWN_STRING

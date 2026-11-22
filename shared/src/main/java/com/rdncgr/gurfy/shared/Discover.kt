@@ -515,13 +515,27 @@ fun NowPlayingScreen(nav: Nav) {
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     if (addToList) AddToPlaylistDialog(listOf(song)) { addToList = false }
-    if (confirmDelete) ServerDeleteDialog(song) { confirmDelete = false }
+    if (confirmDelete) {
+        if (song.isLocal) PhoneDeleteDialog("Şarkı silinsin mi?", 1, 0, { confirmDelete = false }) { PhoneDelete.delete(listOf(song)) }
+        else ServerDeleteDialog(song) { confirmDelete = false }
+    }
     var editGenre by remember { mutableStateOf(false) }
     if (editGenre) GenreEditDialog(song) { editGenre = false }
 
     // Üst kısım kayar; oynatma paneli ekranın altında sabit kalır (uzun isimler onu aşağı itmez)
     Column(Modifier.fillMaxSize()) {
         Header("Şimdi çalıyor", nav) {
+            if (!radio && song.isLocal) Box {
+                // Yalnızca telefonda duran şarkı
+                IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Seçenekler") }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Telefondan sil") },
+                        leadingIcon = { Icon(Icons.Filled.DeleteForever, contentDescription = null) },
+                        onClick = { menu = false; confirmDelete = true },
+                    )
+                }
+            }
             if (!radio && !song.isLocal) Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Seçenekler") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -531,7 +545,7 @@ fun NowPlayingScreen(nav: Nav) {
                         onClick = { menu = false; addToList = true },
                     )
                     if (saved) DropdownMenuItem(
-                        text = { Text("Telefondan sil") },
+                        text = { Text("Telefondan kaldır") },
                         leadingIcon = { Icon(Icons.Filled.MobileOff, contentDescription = null) },
                         onClick = { menu = false; Graph.offline.delete(song.id) },
                     )

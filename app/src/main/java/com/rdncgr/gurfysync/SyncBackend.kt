@@ -24,7 +24,8 @@ class SyncApp : Application() {
 }
 
 class SyncBackend(ctx: Context, private val settings: Settings) : Backend {
-    override val library: Library = Subsonic(settings, File(ctx.filesDir, "cache"))
+    // Navidrome + telefonun kendi müzikleri tek kütüphane
+    override val library: Library = PhoneLibrary(ctx, Subsonic(settings, File(ctx.filesDir, "cache")))
     override val service: MusicService = ServiceApi(settings)
     override val libraryReady: Boolean get() = settings.navidromeUrl.isNotBlank() && settings.user.isNotBlank()
     override val serviceReady: Boolean get() = settings.serviceUrl.isNotBlank()
@@ -40,7 +41,7 @@ class SyncBackend(ctx: Context, private val settings: Settings) : Backend {
 
 // --------------------------------------------------------- ayarlar: bağlantılar
 
-/** Navidrome, Nota servisi, Last.fm ve servis içi bağlantıları tek seferde sınar. */
+/** Navidrome, Gurfy servisi, Last.fm ve servis içi bağlantıları tek seferde sınar. */
 internal fun checkAll(): List<Status> {
     val out = mutableListOf<Status>()
     try {
@@ -67,7 +68,7 @@ internal fun checkAll(): List<Status> {
             if (h.has("youtube_ipv6")) out += Status(
                 "YouTube IPv6", h.optBoolean("youtube_ipv6"),
                 if (h.optBoolean("youtube_ipv6")) "IPv6 ile çıkılıyor; bot engeli çok daha seyrek"
-                else "Yalnızca IPv4: YAML'da nota-servis için network_mode: host kullanın",
+                else "Yalnızca IPv4: YAML'da gurfy-servis için network_mode: host kullanın",
             )
             out += Status(
                 "YouTube JS çözücü", h.optBoolean("js_runtime"),

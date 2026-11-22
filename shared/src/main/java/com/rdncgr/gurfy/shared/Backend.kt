@@ -97,6 +97,15 @@ interface Library {
     /** Şarkının dosyasını telefona kopyalamak için adres (yalnızca [Backend.hasRemoteLibrary] iken). */
     fun downloadUrl(id: String): String = streamUrl(id)
 
+    /** Şarkının telefondaki dosyası (MediaStore adresi); telefonda değilse null. */
+    fun phoneUri(song: Song): String? = song.localUri
+
+    /** Telefondan silinen şarkılar (Gurfy: veritabanından ve listelerden de çıkarılır). */
+    fun phoneDeleted(ids: List<String>) {}
+
+    /** "Müzik ve ses" izni verildi: telefonun müzikleri yeniden taransın. */
+    fun phoneAccessChanged() {}
+
     /** En çok dinlenen şarkılar: sık dinlenen albümlerdeki şarkılar dinlenme sayısına göre sıralanır. */
     fun frequentSongs(limit: Int): List<Song> {
         val albums = albums("frequent", 30)
@@ -216,6 +225,6 @@ object Words {
     val downloading get() = if (remote) "Sunucuya indiriliyor" else "İndiriliyor"
     val delete get() = if (remote) "Sunucudan sil" else "Kalıcı olarak sil"
     val deleteQuestion get() = if (remote) "Sunucudan silinsin mi?" else "Şarkı silinsin mi?"
-    val deleteWhere get() = if (remote) "sunucudaki müzik klasöründen" else "telefonun Music/Gurfy klasöründen"
+    val deleteWhere get() = if (remote) "sunucudaki müzik klasöründen" else "telefondan"
     val deleted get() = if (remote) "sunucudan silindi" else "silindi"
 }
