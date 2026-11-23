@@ -24,7 +24,7 @@ object SettingsBackup {
     val keys = setOf(
         "navidromeUrl", "user", "pass", "serviceUrl", "serviceKey", "lastfmUser", "listenbrainzUser",
         "autoOffline", "autoOfflineCount", "wifiOnly", "offlineExcluded", "crossfadeSec", "playMode",
-        "repeatMode", "radioShuffle", "radioPool", "lastRadio", "homeOrder", "homeHidden", "searchHistory", "heard", "skips",
+        "repeatMode", "radioShuffle", "radioPool", "lastRadio", "leftHand", "homeOrder", "homeHidden", "searchHistory", "heard", "skips",
     )
 
     /** Geri yükleme olunca artar; ayar ekranları alanlarını yeniden okusun. */

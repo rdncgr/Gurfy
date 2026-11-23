@@ -75,25 +75,27 @@ fun RadioStrip(nav: Nav) {
 @Composable
 fun RadioRow(r: RadioStation, onPlay: () -> Unit, trailing: @Composable () -> Unit = {}) {
     val playing = Graph.player.current?.streamUrl == r.url
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onPlay).padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioLogo(r, 44.dp)
-        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-            Text(
-                r.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                color = if (playing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            )
-            val sub = r.tags.split(',').filter { it.isNotBlank() }.take(3).joinToString(" · ")
-            if (sub.isNotBlank()) {
+    HandRow {
+        Row(
+            Modifier.fillMaxWidth().clickable(onClick = onPlay).padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioLogo(r, 44.dp)
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(
-                    sub, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    r.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = if (playing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 )
+                val sub = r.tags.split(',').filter { it.isNotBlank() }.take(3).joinToString(" · ")
+                if (sub.isNotBlank()) {
+                    Text(
+                        sub, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
+            trailing()
         }
-        trailing()
     }
 }
 

@@ -297,7 +297,7 @@ class ListenService : Service() {
     private val main = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var wm: WindowManager
-    private var ball: TextView? = null
+    private var ball: ImageView? = null
     private var ballParams: WindowManager.LayoutParams? = null
     private var card: View? = null
     private var pulse: ValueAnimator? = null
@@ -333,7 +333,7 @@ class ListenService : Service() {
                 listen(projection)
             }
             CAPTURE_MIC -> listen(null)
-            CAPTURE_DENIED -> showMessage("Telefon sesi için izin verilmedi. Topa dokunup yeniden dene ya da Mikrofon'u seç.")
+            CAPTURE_DENIED -> setBall(BallState.MISS)
         }
         return START_NOT_STICKY
     }
@@ -413,12 +413,10 @@ class ListenService : Service() {
     private fun showBall() {
         if (ball != null) return
         val size = dp(60)
-        val v = TextView(this).apply {
-            text = "♪"
-            setTextColor(0xFF101418.toInt())
-            textSize = 28f
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
+        val v = ImageView(this).apply {
+            setImageResource(R.drawable.ic_top_nota)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(dp(14), dp(14), dp(14), dp(14))
             background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(accent); setStroke(dp(2), 0x33FFFFFF) }
             elevation = dp(6).toFloat()
             contentDescription = "Şarkıyı bul"
@@ -554,18 +552,94 @@ class ListenService : Service() {
         if (hot) t.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
     }
 
-    private fun setListening(on: Boolean) {
+    /** Topun durumu yazıyla değil simgeyle gösterilir. */
+    private enum class BallState { IDLE, LISTEN, SEARCH, FOUND, MISS }
+
+    private val resetBall = Runnable { setBall(BallState.IDLE) }
+    private var ballState = BallState.IDLE
+
+    /** Dinleme süresini gösteren, topun kenarında saat yönünde dolan kırmızı halka. */
+    private inner class Ring : android.graphics.drawable.Drawable() {
+        private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            style = android.graphics.Paint.Style.STROKE
+            strokeWidth = dp(4).toFloat()
+            strokeCap = android.graphics.Paint.Cap.ROUND
+            color = 0xFFE53935.toInt()
+        }
+        private val oval = android.graphics.RectF()
+        var progress = -1f // < 0: gizli
+            set(v) { field = v; invalidateSelf() }
+
+        override fun draw(c: android.graphics.Canvas) {
+            if (progress < 0f) return
+            val inset = paint.strokeWidth / 2 + dp(1)
+            oval.set(bounds.left + inset, bounds.top + inset, bounds.right - inset, bounds.bottom - inset)
+            c.drawArc(oval, -90f, 360f * progress.coerceIn(0f, 1f), false, paint)
+        }
+        override fun setAlpha(alpha: Int) { paint.alpha = alpha }
+        override fun setColorFilter(cf: android.graphics.ColorFilter?) { paint.colorFilter = cf }
+        @Deprecated("Deprecated in Java")
+        override fun getOpacity() = PixelFormat.TRANSLUCENT
+    }
+
+    private val ring by lazy { Ring() }
+
+    private fun setBall(state: BallState) {
+        ballState = state
         val v = ball ?: return
+        main.removeCallbacks(resetBall)
         pulse?.cancel(); pulse = null
-        v.scaleX = 1f; v.scaleY = 1f
-        if (on) {
-            pulse = ObjectAnimator.ofFloat(v, View.SCALE_X, 1f, 1.18f).apply {
-                duration = 600; repeatMode = ValueAnimator.REVERSE; repeatCount = ValueAnimator.INFINITE
+        v.animate().cancel()
+        v.scaleX = 1f; v.scaleY = 1f; v.rotation = 0f; v.translationX = 0f
+        if (v.foreground !== ring) v.foreground = ring
+        ring.progress = if (state == BallState.LISTEN) 0f else -1f
+        v.setImageResource(
+            when (state) {
+                BallState.IDLE -> R.drawable.ic_top_nota
+                BallState.LISTEN -> R.drawable.ic_top_dinle
+                BallState.SEARCH -> R.drawable.ic_top_ara
+                BallState.FOUND -> R.drawable.ic_top_tamam
+                BallState.MISS -> R.drawable.ic_top_yok
+            },
+        )
+        val color = when (state) {
+            BallState.MISS -> 0xFFE05555.toInt()
+            else -> accent
+        }
+        (v.background as? GradientDrawable)?.setColor(color)
+        v.contentDescription = when (state) {
+            BallState.IDLE -> "Şarkıyı bul"
+            BallState.LISTEN -> "Dinleniyor"
+            BallState.SEARCH -> "Şarkı aranıyor"
+            BallState.FOUND -> "Şarkı bulundu"
+            BallState.MISS -> "Şarkı bulunamadı"
+        }
+        when (state) {
+            // Dinlerken top büyüyüp küçülür (pencereden taşmasın diye küçülerek)
+            BallState.LISTEN -> pulse = ObjectAnimator.ofFloat(v, View.SCALE_X, 1f, 0.82f).apply {
+                duration = 550; repeatMode = ValueAnimator.REVERSE; repeatCount = ValueAnimator.INFINITE
                 addUpdateListener { v.scaleY = v.scaleX }
                 start()
             }
+            // Ararken büyüteç küçük bir daire çizer gibi sallanır
+            BallState.SEARCH -> pulse = ObjectAnimator.ofFloat(v, View.ROTATION, -18f, 18f).apply {
+                duration = 450; repeatMode = ValueAnimator.REVERSE; repeatCount = ValueAnimator.INFINITE
+                start()
+            }
+            // Bulamayınca X ile iki yana sallanır, sonra nota simgesine döner
+            BallState.MISS -> {
+                pulse = ObjectAnimator.ofFloat(v, View.TRANSLATION_X, 0f, -dp(6).toFloat(), dp(6).toFloat(), -dp(4).toFloat(), dp(4).toFloat(), 0f).apply {
+                    duration = 450; start()
+                }
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                main.postDelayed(resetBall, 2_500)
+            }
+            BallState.FOUND -> main.postDelayed(resetBall, 4_000)
+            BallState.IDLE -> {}
         }
     }
+
+    private fun setListening(on: Boolean) = setBall(if (on) BallState.LISTEN else BallState.IDLE)
 
     /** Dokununca topun yanında iki seçenek açılır: telefonun kendi sesi ya da mikrofon. */
     private fun onTap() {
@@ -655,26 +729,26 @@ class ListenService : Service() {
             showMessage("Mikrofon izni yok. Uygulamayı açıp Ana sayfadaki düğmeyle yeniden izin ver.")
             return
         }
-        setListening(true)
-        showMessage(if (projection != null) "Dinleniyor… (telefon sesi)" else "Dinleniyor… (mikrofon)", buttons = false)
+        // Geri bildirim topun simgesiyle: dinlerken mikrofon, ararken büyüteç, bulamazsa X
+        removeCard()
+        setBall(BallState.LISTEN)
         job = scope.launch {
             try {
                 val (pcm, how) = withContext(Dispatchers.IO) { capture(projection) }
                 projection?.stop()
                 if (projection != null) goForeground(false)
-                showMessage("Şarkı aranıyor…", buttons = false)
+                setBall(BallState.SEARCH)
                 val r = withContext(Dispatchers.IO) { Graph.service.recognizeAudio(pcm, SOURCE) }
-                setListening(false)
                 if (r.song != null) {
+                    setBall(BallState.FOUND)
                     SongId.addHeard(r)
                     showResult(r, how)
                 } else {
-                    showMessage(r.message ?: "Şarkı tanınamadı", retry = true)
+                    setBall(BallState.MISS)
                 }
             } catch (e: Exception) {
                 projection?.stop()
-                setListening(false)
-                showMessage(errorText(e, "Şarkı bulunamadı"), retry = true)
+                setBall(BallState.MISS)
             }
         }
     }
@@ -700,20 +774,20 @@ class ListenService : Service() {
             if (rec != null && rec.state == AudioRecord.STATE_INITIALIZED) {
                 try {
                     rec.startRecording()
-                    val first = read(rec, 3 * RATE)
-                    if (rms(first) > 120) return (first + read(rec, (SECONDS - 3) * RATE)) to "cihaz sesinden"
+                    val first = read(rec, 3 * RATE, 0, SECONDS * RATE)
+                    if (rms(first) > 120) return (first + read(rec, (SECONDS - 3) * RATE, 3 * RATE, SECONDS * RATE)) to "cihaz sesinden"
                 } finally {
                     try { rec.stop() } catch (e: Exception) { }
                     rec.release()
                 }
             }
-            main.post { showMessage("Uygulama sesini paylaşmıyor, mikrofondan dinleniyor…", buttons = false) }
         }
         val mic = AudioRecord(MediaRecorder.AudioSource.MIC, RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufSize)
         if (mic.state != AudioRecord.STATE_INITIALIZED) { mic.release(); throw IllegalStateException("Mikrofon açılamadı") }
         try {
             mic.startRecording()
-            val pcm = read(mic, SECONDS * RATE)
+            // Telefon sesi sessiz çıkıp mikrofona geçildiyse halka baştan dolar
+            val pcm = read(mic, SECONDS * RATE, 0, SECONDS * RATE)
             if (rms(pcm) < 30) throw IllegalStateException("Ses duyulmadı. Müzik telefonun hoparlöründen çalıyor mu, ses açık mı?")
             return pcm to "mikrofondan"
         } finally {
@@ -722,13 +796,16 @@ class ListenService : Service() {
         }
     }
 
-    private fun read(rec: AudioRecord, n: Int): ShortArray {
+    /** [offset]/[total]: toplam dinlemenin neresinde olunduğu; topun kırmızı halkasını doldurur. */
+    private fun read(rec: AudioRecord, n: Int, offset: Int, total: Int): ShortArray {
         val out = ShortArray(n)
         var at = 0
         while (at < n && job?.isCancelled != true) {
             val got = rec.read(out, at, minOf(4096, n - at))
             if (got <= 0) break
             at += got
+            val f = (offset + at).toFloat() / total
+            main.post { if (ballState == BallState.LISTEN) ring.progress = f }
         }
         return if (at == n) out else out.copyOf(at)
     }

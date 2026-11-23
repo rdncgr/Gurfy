@@ -151,6 +151,15 @@ class Settings(ctx: Context) {
     var wifiOnly: Boolean
         get() = prefs.getBoolean("wifiOnly", true)
         set(v) = prefs.edit().putBoolean("wifiOnly", v).apply()
+    /** Gurfy: YouTube'dan indirme kuyruğu yalnızca Wi-Fi (ücretsiz ağ) varken ilerler. */
+    var downloadWifiOnly: Boolean
+        get() = prefs.getBoolean("downloadWifiOnly", false)
+        set(v) = prefs.edit().putBoolean("downloadWifiOnly", v).apply()
+    /** Sol el: üst başlık ve oynatıcı çubuğu aynalanır (düğmeler sola gelir). */
+    val leftHandState = androidx.compose.runtime.mutableStateOf(prefs.getBoolean("leftHand", false))
+    var leftHand: Boolean
+        get() = leftHandState.value
+        set(v) { leftHandState.value = v; prefs.edit().putBoolean("leftHand", v).apply() }
     var lastAutoSync: Long
         get() = prefs.getLong("lastAutoSync", 0L)
         set(v) = prefs.edit().putLong("lastAutoSync", v).apply()
@@ -237,6 +246,13 @@ class Settings(ctx: Context) {
 }
 
 // ---------------------------------------------------------------- yardımcılar
+
+/** Wi-Fi ya da başka ücretsiz ağ (mobil veri değil). */
+fun onUnmeteredNetwork(ctx: Context): Boolean {
+    val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+    return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+}
 
 fun enc(s: String): String = URLEncoder.encode(s, "UTF-8")
 
@@ -365,11 +381,6 @@ object AutoOffline {
         }
     }
 
-    private fun onUnmeteredNetwork(ctx: Context): Boolean {
-        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
-        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
-    }
 
     /** force = kullanıcı "Şimdi eşitle" dedi: zaman ve Wi-Fi sınırını yok say. */
     fun run(force: Boolean = false) {
@@ -468,7 +479,7 @@ object Favorites {
 
 data class HomeSection(val key: String, val title: String, val visible: Boolean)
 
-/** Ana sayfadaki bölümlerin sırası ve görünürlüğü; Ayarlar > Ana sayfa'dan değiştirilir. */
+/** Ana sayfadaki bölümlerin sırası ve görünürlüğü; Ayarlar > Genel'den değiştirilir. */
 object HomeLayout {
     val titles = linkedMapOf(
         "playlists" to "Listelerim",

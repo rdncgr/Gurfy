@@ -335,6 +335,11 @@ class PlayerController(private val ctx: Context) {
         }
     }
 
+    /** Hiçbir şey çalmıyorken oynatıcının çal düğmesi: karışık moduna göre rastgele ya da sana özel liste. */
+    fun startMix() = startFrom {
+        if (mode == PlayMode.SHUFFLE) Graph.subsonic.randomSongs() else Graph.subsonic.smartMix()
+    }
+
     private fun startFrom(source: () -> List<Song>) {
         if (preparing) return
         preparing = true

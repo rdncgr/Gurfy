@@ -15,6 +15,7 @@ import com.rdncgr.gurfy.shared.DownloadJob
 import com.rdncgr.gurfy.shared.Graph
 import com.rdncgr.gurfy.shared.Jobs
 import com.rdncgr.gurfy.shared.Suggestion
+import com.rdncgr.gurfy.shared.onUnmeteredNetwork
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -245,6 +246,12 @@ class DownloadService : Service() {
             while (true) {
                 val active = Local.db.jobs().activeCount()
                 if (active == 0) break
+                // Ayarlar > Çalma > "Yalnızca Wi-Fi'da indir": mobil veride kuyruk bekler
+                if (Graph.settings.downloadWifiOnly && !onUnmeteredNetwork(this@DownloadService)) {
+                    updateNotification("Wi-Fi bekleniyor: $active şarkı sırada")
+                    delay(15_000)
+                    continue
+                }
                 updateNotification("$active şarkı indiriliyor")
                 if (!Downloads.runNext()) {
                     // Sırada yalnızca beklemeye alınmışlar var (bot engeli): zamanı gelince dön

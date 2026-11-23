@@ -22,11 +22,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,6 +52,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -138,10 +145,9 @@ fun Cover(coverArt: String?, size: Dp, modifier: Modifier = Modifier) {
 
 @Composable
 fun Header(title: String, nav: Nav, action: @Composable () -> Unit = {}) {
-    Row(
-        Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    // Sol el düzeninde düğmeler sola, sayfa adı sağa geçer; düğmelerin sırası da ters döner
+    val left = Graph.settings.leftHandState.value
+    val back: @Composable () -> Unit = {
         if (nav.stack.size > 1) {
             IconButton(onClick = { nav.pop() }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
@@ -149,15 +155,53 @@ fun Header(title: String, nav: Nav, action: @Composable () -> Unit = {}) {
         } else {
             Box(Modifier.size(12.dp))
         }
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(start = 4.dp, end = if (left) 12.dp else 8.dp, top = 8.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Sol elde geri düğmesi de en solda kalır: geri, diğer düğmeler (ters sırayla), sağa yaslı başlık
+        back()
+        if (left) MirrorRow(reverse = true, content = action)
         Text(
             title,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            textAlign = if (left) TextAlign.Right else TextAlign.Left,
             modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
         )
-        action()
+        if (!left) MirrorRow(reverse = false, content = action)
+    }
+}
+
+/**
+ * Liste satırları için: sol el düzeninde satır aynalanır (kapak sağda, menü ve simgeler solda ve ters sırada,
+ * yazılar sağa yaslı). Yazının kendisi soldan sağa okunmaya devam eder.
+ */
+@Composable
+fun HandRow(content: @Composable () -> Unit) {
+    if (Graph.settings.leftHandState.value) {
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl, content = content)
+    } else content()
+}
+
+/** Çocuklarını yan yana dizer; reverse ise sağdan sola (sol el düzeni). İçerik aynalanmaz. */
+@Composable
+fun MirrorRow(reverse: Boolean, content: @Composable () -> Unit) {
+    Layout(content) { measurables, c ->
+        val loose = c.copy(minWidth = 0, minHeight = 0)
+        val placeables = measurables.map { it.measure(loose) }
+        val w = placeables.sumOf { it.width }.coerceAtMost(c.maxWidth)
+        val h = placeables.maxOfOrNull { it.height } ?: 0
+        layout(w, h) {
+            var x = 0
+            (if (reverse) placeables.asReversed() else placeables).forEach {
+                it.place(x, (h - it.height) / 2)
+                x += it.width
+            }
+        }
     }
 }
 
@@ -299,28 +343,56 @@ fun GurfyRoot() {
 @Composable
 fun MiniPlayer(nav: Nav) {
     val p = Graph.player
-    val song = p.current ?: return
+    // Hiçbir şey çalmıyorken de görünür: çal düğmesi karışık moduna göre bir liste başlatır
+    val song = p.current
+    val left = Graph.settings.leftHandState.value
     Row(
         Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable { nav.push(Screen.NowPlaying) }
+            .clickable { if (song != null) nav.push(Screen.NowPlaying) else p.startMix() }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Cover(song.coverArt, 44.dp)
-        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-            Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-            Text(
-                song.artist, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        val cover: @Composable () -> Unit = {
+            if (song != null) Cover(song.coverArt, 44.dp)
+            else Box(
+                Modifier.size(44.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceContainer),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Filled.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
-        IconButton(onClick = { p.toggle() }) {
-            Icon(if (p.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = "Çal / duraklat")
+        val align = if (left) TextAlign.Right else TextAlign.Left
+        val texts: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(
+                    song?.title ?: "Çalan şarkı yok", maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    fontWeight = FontWeight.SemiBold, textAlign = align, modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    song?.artist ?: if (p.mode == PlayMode.SHUFFLE) "Çal'a bas, karışık başlasın" else "Çal'a bas, sana özel karışık başlasın",
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = align, modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
-        IconButton(onClick = { p.next() }) {
-            Icon(Icons.Filled.SkipNext, contentDescription = "Sonraki")
+        val playBtn: @Composable () -> Unit = {
+            IconButton(onClick = { if (song != null) p.toggle() else p.startMix() }) {
+                if (song == null && p.preparing) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                else Icon(if (p.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = "Çal / duraklat")
+            }
         }
+        val nextBtn: @Composable () -> Unit = {
+            IconButton(onClick = { p.next() }, enabled = song != null) {
+                Icon(Icons.Filled.SkipNext, contentDescription = "Sonraki")
+            }
+        }
+        val prevBtn: @Composable () -> Unit = {
+            IconButton(onClick = { p.previous() }, enabled = song != null) {
+                Icon(Icons.Filled.SkipPrevious, contentDescription = "Önceki")
+            }
+        }
+        // Sol el: önceki, çal/duraklat, sonraki solda; sağa yaslı şarkı ve şarkıcı adı, en sağda kapak
+        if (!left) { cover(); texts(); playBtn(); nextBtn() }
+        else { prevBtn(); playBtn(); nextBtn(); texts(); cover() }
     }
 }

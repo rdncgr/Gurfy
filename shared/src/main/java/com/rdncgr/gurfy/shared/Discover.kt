@@ -43,29 +43,31 @@ private fun keyOf(s: Suggestion) = s.artist.lowercase() + "|" + s.title.lowercas
 
 @Composable
 fun SuggestionRow(s: Suggestion, queued: Boolean, onDownload: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(s.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                if (s.note.isNullOrBlank()) s.artist else "${s.artist} · ${s.note}", maxLines = 1, overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (!s.inLibrary) PreviewButton(s)
-        when {
-            s.inLibrary -> Text(
-                "Kütüphanede", style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(end = 12.dp),
-            )
-            queued -> Text(
-                "Sıraya alındı", style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 12.dp),
-            )
-            else -> IconButton(onClick = onDownload) {
-                Icon(Icons.Filled.CloudDownload, contentDescription = Words.download)
+    HandRow {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(s.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (s.note.isNullOrBlank()) s.artist else "${s.artist} · ${s.note}", maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (!s.inLibrary) PreviewButton(s)
+            when {
+                s.inLibrary -> Text(
+                    "Kütüphanede", style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(end = 12.dp),
+                )
+                queued -> Text(
+                    "Sıraya alındı", style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 12.dp),
+                )
+                else -> IconButton(onClick = onDownload) {
+                    Icon(Icons.Filled.CloudDownload, contentDescription = Words.download)
+                }
             }
         }
     }
@@ -179,24 +181,26 @@ fun DownloadProgressLine(modifier: Modifier = Modifier) {
 
 @Composable
 private fun JobRow(j: DownloadJob) {
-    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 2.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
-            Text("${j.artist} – ${j.title}", maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                statusText(j), maxLines = 2, overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (j.status == "error") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        // Sürmekte olan indirme silinemez; sıradaki silinirse hiç indirilmez
-        if (j.status != "downloading") IconButton(onClick = {
-            Jobs.list.removeAll { it.id == j.id }
-            Graph.io { Graph.service.deleteJobs(listOf(j.id)) }
-        }) {
-            Icon(
-                Icons.Filled.Close, contentDescription = if (j.status == "queued") "Sıradan çıkar" else "Listeden sil",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    HandRow {
+        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 2.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
+                Text("${j.artist} – ${j.title}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    statusText(j), maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (j.status == "error") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            // Sürmekte olan indirme silinemez; sıradaki silinirse hiç indirilmez
+            if (j.status != "downloading") IconButton(onClick = {
+                Jobs.list.removeAll { it.id == j.id }
+                Graph.io { Graph.service.deleteJobs(listOf(j.id)) }
+            }) {
+                Icon(
+                    Icons.Filled.Close, contentDescription = if (j.status == "queued") "Sıradan çıkar" else "Listeden sil",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -216,7 +220,7 @@ fun DiscoverScreen(nav: Nav) {
         Triple("Ara", Icons.Filled.Search, 0),
         Triple("Sana özel", Icons.Filled.AutoAwesome, 0),
         Triple("Popüler", Icons.AutoMirrored.Filled.TrendingUp, 0),
-        Triple("Radyodan", Icons.Filled.GraphicEq, 0),
+        Triple("Duyduklarım", Icons.Filled.Hearing, 0),
         Triple("İndirmeler", Icons.Filled.CloudDownload, active),
     )
 
@@ -601,15 +605,45 @@ fun NowPlayingScreen(nav: Nav) {
         )
         val liked = Favorites.isStarred(song)
         val live = LiveMeta.title?.takeIf { radio && !it.equals(song.title, ignoreCase = true) }
-        // Başlık solda, şarkıya ait işlemler sağda simge olarak
+        // Başlık solda, şarkıya ait işlemler sağda simge olarak; sol el düzeninde tersi (simgeler ters sırayla)
+        val left = Graph.settings.leftHandState.value
+        val align = if (left) TextAlign.Right else TextAlign.Left
         Row(
-            Modifier.fillMaxWidth().padding(start = 28.dp, end = 16.dp),
+            Modifier.fillMaxWidth().padding(start = if (left) 16.dp else 28.dp, end = if (left) 28.dp else 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(Modifier.weight(1f)) {
+            val icons: @Composable () -> Unit = {
+                if (radio) {
+                    RadioFavoriteButton(song)
+                    IconButton(onClick = { nav.tab(Screen.Library); LibraryTab.selected = 4 }) {
+                        Icon(Icons.Filled.Radio, contentDescription = "Kütüphane > Radyo")
+                    }
+                }
+                if (!radio) {
+                    IconButton(onClick = { nav.push(Screen.Similar(song.artist, song.title)) }) {
+                        Icon(Icons.Filled.TravelExplore, contentDescription = "Benzerlerini bul")
+                    }
+                    if (!song.isLocal && Graph.backend.hasRemoteLibrary) IconButton(enabled = !saved, onClick = { Graph.saveOffline(song) }) {
+                        Icon(
+                            if (saved) Icons.Filled.DownloadDone else Icons.Filled.Download,
+                            contentDescription = if (saved) "Telefonda" else "Telefona indir",
+                            tint = if (saved) MaterialTheme.colorScheme.secondary else LocalContentColor.current,
+                        )
+                    }
+                    if (!song.isLocal) IconButton(onClick = { Favorites.toggle(song) }) {
+                        Icon(
+                            if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            contentDescription = if (liked) "Beğeniyi kaldır" else "Beğen",
+                            tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            val texts: @Composable RowScope.() -> Unit = {
+            Column(Modifier.weight(1f), horizontalAlignment = if (left) Alignment.End else Alignment.Start) {
                 Text(
                     song.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = align,
                 )
                 if (live != null) {
                     // Yayının gönderdiği şarkı adı
@@ -625,36 +659,13 @@ fun NowPlayingScreen(nav: Nav) {
                     }
                 } else {
                     Text(
-                        song.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+                        song.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, textAlign = align,
                         overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp),
                     )
                 }
             }
-            if (radio) {
-                RadioFavoriteButton(song)
-                IconButton(onClick = { nav.tab(Screen.Library); LibraryTab.selected = 4 }) {
-                    Icon(Icons.Filled.Radio, contentDescription = "Kütüphane > Radyo")
-                }
             }
-            if (!radio) {
-                IconButton(onClick = { nav.push(Screen.Similar(song.artist, song.title)) }) {
-                    Icon(Icons.Filled.TravelExplore, contentDescription = "Benzerlerini bul")
-                }
-                if (!song.isLocal && Graph.backend.hasRemoteLibrary) IconButton(enabled = !saved, onClick = { Graph.saveOffline(song) }) {
-                    Icon(
-                        if (saved) Icons.Filled.DownloadDone else Icons.Filled.Download,
-                        contentDescription = if (saved) "Telefonda" else "Telefona indir",
-                        tint = if (saved) MaterialTheme.colorScheme.secondary else LocalContentColor.current,
-                    )
-                }
-                if (!song.isLocal) IconButton(onClick = { Favorites.toggle(song) }) {
-                    Icon(
-                        if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                        contentDescription = if (liked) "Beğeniyi kaldır" else "Beğen",
-                        tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            if (left) { MirrorRow(reverse = true, content = icons); texts() } else { texts(); MirrorRow(reverse = false, content = icons) }
         }
 
         if (radio) SongIdPanel(song)
@@ -856,10 +867,8 @@ fun OfflineSettings() {
 
 // --------------------------------------------------------------------- ayarlar
 
-// Gurfy'de kütüphane zaten telefonda: "Çevrimdışı" sekmesi yok
-private val settingsTabs get() =
-    if (Graph.backend.hasRemoteLibrary) listOf("Ana sayfa", "Çalma", "Çevrimdışı", "Bağlantılar")
-    else listOf("Ana sayfa", "Çalma", "Bağlantılar")
+// Çevrimdışı (telefona indirme) ayarları Çalma sekmesinde; Gurfy'de kütüphane zaten telefonda
+private val settingsTabs get() = listOf("Genel", "Çalma", "Bağlantılar")
 
 @Composable
 fun SettingsScreen(nav: Nav) {
@@ -881,12 +890,16 @@ fun SettingsScreen(nav: Nav) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                 Spacer(Modifier.height(6.dp))
                 when (tabs[page]) {
-                    "Ana sayfa" -> SettingsCard { HomeSettings() }
+                    "Genel" -> {
+                        SettingsCard { HandSettings() }
+                        SettingsCard { HomeSettings() }
+                    }
                     "Çalma" -> {
                         SettingsCard { PlaybackSettings() }
                         SettingsCard { CrossfadeSettings() }
+                        if (Graph.backend.hasRemoteLibrary) SettingsCard { OfflineSettings() }
+                        else SettingsCard { DownloadNetworkSettings() }
                     }
-                    "Çevrimdışı" -> SettingsCard { OfflineSettings() }
                     else -> {
                         Graph.backend.ConnectionSettings()
                         SettingsCard { UpdateSettings() }
@@ -895,6 +908,37 @@ fun SettingsScreen(nav: Nav) {
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
+}
+
+// ----------------------------------------------------------- ayarlar: genel
+
+@Composable
+private fun HandSettings() {
+    val s = Graph.settings
+    InfoTitle(
+        "Sol el kullanımı",
+        "Geri ve üst başlıktaki diğer düğmeler sola, sayfa adı sağa geçer; alttaki oynatıcıda önceki, çal ve sonraki düğmeleri sola, " +
+            "şarkı adı ve kapak sağa gelir. Telefonu sol elle kullanırken düğmelere başparmakla ulaşmak kolaylaşır.",
+    )
+    SwitchRow(
+        "Sol el düzeni", "Düğmeler ekranın solunda",
+        s.leftHandState.value,
+    ) { s.leftHand = it }
+}
+
+/** Gurfy: YouTube'dan indirmeler mobil veride bekletilebilir. */
+@Composable
+private fun DownloadNetworkSettings() {
+    val s = Graph.settings
+    var wifi by remember { mutableStateOf(s.downloadWifiOnly) }
+    InfoTitle(
+        "İndirme",
+        "Açıkken şarkılar yalnızca Wi-Fi'dayken indirilir; mobil veride indirme sırası bekler, Wi-Fi gelince kendiliğinden sürer.",
+    )
+    SwitchRow("Yalnızca Wi-Fi'da indir", "Mobil veri harcanmaz", wifi) {
+        wifi = it
+        s.downloadWifiOnly = it
     }
 }
 

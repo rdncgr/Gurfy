@@ -82,122 +82,124 @@ fun SongRow(song: Song, nav: Nav, onRemove: (() -> Unit)? = null, onClick: () ->
     val busy = offline.inProgress[song.id] == true
     val isCurrent = Graph.player.current?.id == song.id
 
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Cover(song.coverArt, 48.dp)
-        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-            Text(
-                song.title, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
-            )
-            Text(
-                song.artist, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        val liked = Favorites.isStarred(song)
-        if (liked) {
-            Icon(
-                Icons.Filled.Favorite, contentDescription = "Beğenildi",
-                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp).padding(end = 2.dp),
-            )
-        }
-        if (busy) {
-            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-        } else SourceIcon(song)
-        Box {
-            IconButton(onClick = { menu = true }) {
-                Icon(Icons.Filled.MoreVert, contentDescription = "Seçenekler")
+    HandRow {
+        Row(
+            Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Cover(song.coverArt, 48.dp)
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(
+                    song.title, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                )
+                Text(
+                    song.artist, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            if (song.isLocal) DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                // Yalnızca telefonda duran şarkı: Navidrome tanımadığı için beğeni / liste yok
-                DropdownMenuItem(
-                    text = { Text("Benzerlerini bul") },
-                    onClick = {
-                        menu = false
-                        nav.push(Screen.Similar(song.artist, song.title))
-                    },
+            val liked = Favorites.isStarred(song)
+            if (liked) {
+                Icon(
+                    Icons.Filled.Favorite, contentDescription = "Beğenildi",
+                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp).padding(end = 2.dp),
                 )
-                song.albumId?.let { albumId ->
-                    DropdownMenuItem(
-                        text = { Text("Albüme git") },
-                        onClick = {
-                            menu = false
-                            nav.push(Screen.AlbumDetail(albumId))
-                        },
-                    )
+            }
+            if (busy) {
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+            } else SourceIcon(song)
+            Box {
+                IconButton(onClick = { menu = true }) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = "Seçenekler")
                 }
-                DropdownMenuItem(
-                    text = { Text("Telefondan sil") },
-                    onClick = {
-                        menu = false
-                        confirmDelete = true
-                    },
-                )
-            } else DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                if (Graph.backend.hasRemoteLibrary) DropdownMenuItem(
-                    text = { Text(if (saved) "Telefondan kaldır" else "Telefona indir") },
-                    onClick = {
-                        menu = false
-                        if (saved) offline.delete(song.id) else Graph.saveOffline(song)
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(if (liked) "Beğeniyi kaldır" else "Beğen") },
-                    onClick = {
-                        menu = false
-                        Favorites.toggle(song)
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text("Listeye ekle") },
-                    onClick = {
-                        menu = false
-                        addToList = true
-                    },
-                )
-                if (Graph.settings.serviceConfigured) DropdownMenuItem(
-                    text = { Text("Türü düzenle") },
-                    onClick = {
-                        menu = false
-                        editGenre = true
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(Words.delete) },
-                    onClick = {
-                        menu = false
-                        confirmDelete = true
-                    },
-                )
-                if (onRemove != null) {
+                if (song.isLocal) DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    // Yalnızca telefonda duran şarkı: Navidrome tanımadığı için beğeni / liste yok
                     DropdownMenuItem(
-                        text = { Text("Listeden çıkar") },
+                        text = { Text("Benzerlerini bul") },
                         onClick = {
                             menu = false
-                            onRemove()
+                            nav.push(Screen.Similar(song.artist, song.title))
                         },
                     )
-                }
-                DropdownMenuItem(
-                    text = { Text("Benzerlerini bul") },
-                    onClick = {
-                        menu = false
-                        nav.push(Screen.Similar(song.artist, song.title))
-                    },
-                )
-                val albumId = song.albumId
-                if (albumId != null) {
+                    song.albumId?.let { albumId ->
+                        DropdownMenuItem(
+                            text = { Text("Albüme git") },
+                            onClick = {
+                                menu = false
+                                nav.push(Screen.AlbumDetail(albumId))
+                            },
+                        )
+                    }
                     DropdownMenuItem(
-                        text = { Text("Albüme git") },
+                        text = { Text("Telefondan sil") },
                         onClick = {
                             menu = false
-                            nav.push(Screen.AlbumDetail(albumId))
+                            confirmDelete = true
                         },
                     )
+                } else DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    if (Graph.backend.hasRemoteLibrary) DropdownMenuItem(
+                        text = { Text(if (saved) "Telefondan kaldır" else "Telefona indir") },
+                        onClick = {
+                            menu = false
+                            if (saved) offline.delete(song.id) else Graph.saveOffline(song)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (liked) "Beğeniyi kaldır" else "Beğen") },
+                        onClick = {
+                            menu = false
+                            Favorites.toggle(song)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Listeye ekle") },
+                        onClick = {
+                            menu = false
+                            addToList = true
+                        },
+                    )
+                    if (Graph.settings.serviceConfigured) DropdownMenuItem(
+                        text = { Text("Türü düzenle") },
+                        onClick = {
+                            menu = false
+                            editGenre = true
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(Words.delete) },
+                        onClick = {
+                            menu = false
+                            confirmDelete = true
+                        },
+                    )
+                    if (onRemove != null) {
+                        DropdownMenuItem(
+                            text = { Text("Listeden çıkar") },
+                            onClick = {
+                                menu = false
+                                onRemove()
+                            },
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text("Benzerlerini bul") },
+                        onClick = {
+                            menu = false
+                            nav.push(Screen.Similar(song.artist, song.title))
+                        },
+                    )
+                    val albumId = song.albumId
+                    if (albumId != null) {
+                        DropdownMenuItem(
+                            text = { Text("Albüme git") },
+                            onClick = {
+                                menu = false
+                                nav.push(Screen.AlbumDetail(albumId))
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -206,28 +208,32 @@ fun SongRow(song: Song, nav: Nav, onRemove: (() -> Unit)? = null, onClick: () ->
 
 @Composable
 fun AlbumRow(album: Album, nav: Nav) {
-    Row(
-        Modifier.fillMaxWidth().clickable { nav.push(Screen.AlbumDetail(album.id)) }
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Cover(album.coverArt, 56.dp)
-        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-            Text(album.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                album.artist, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    HandRow {
+        Row(
+            Modifier.fillMaxWidth().clickable { nav.push(Screen.AlbumDetail(album.id)) }
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Cover(album.coverArt, 56.dp)
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(album.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    album.artist, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
 
 @Composable
 fun SimpleRow(title: String, subtitle: String, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (subtitle.isNotBlank()) {
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    HandRow {
+        Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle.isNotBlank()) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
@@ -318,7 +324,6 @@ fun PlayModeIcon(mode: PlayMode, modifier: Modifier = Modifier) {
 @Composable
 fun HomeScreen(nav: Nav) {
     var refresh by remember { mutableIntStateOf(0) }
-    var creating by remember { mutableStateOf(false) }
     // Sunuculu sürümde ekranı aşağı çekmek yeniler; sunucusuz Gurfy'de yenilenecek bir şey yok
     val remote = Graph.backend.hasRemoteLibrary
     var pulling by remember { mutableStateOf(false) }
@@ -337,21 +342,11 @@ fun HomeScreen(nav: Nav) {
             kotlinx.coroutines.delay(30_000)
         }
     }
-    if (creating) {
-        NameDialog("Yeni liste", confirm = "Oluştur", onDismiss = { creating = false }) { name ->
-            createPlaylist(name)
-            creating = false
-        }
-    }
-
     val page: @Composable () -> Unit = { Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Header(androidx.compose.ui.platform.LocalContext.current.let { it.applicationInfo.loadLabel(it.packageManager).toString() }, nav) {
             ListenBubbleButton() // şarkı bulma topu (diğer uygulamaların üzerinde)
             IconButton(onClick = { nav.push(Screen.Downloads) }) {
                 Icon(Icons.Filled.Smartphone, contentDescription = "Telefondakiler")
-            }
-            IconButton(onClick = { creating = true }) {
-                Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Yeni liste")
             }
             // Sunucuya ulaşılamıyorsa kırmızı X görünür (dokununca yeniden dener)
             if (remote && serverOk == false) IconButton(onClick = { refresh++ }) {

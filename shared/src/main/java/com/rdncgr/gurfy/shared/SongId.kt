@@ -211,53 +211,55 @@ private val timeFormat = SimpleDateFormat("d MMM HH:mm", Locale("tr"))
 fun RecognitionRow(r: Recognition, showStation: Boolean, onRemove: (() -> Unit)? = null) {
     val s = r.song ?: return
     val queued = SongId.queued[SongId.keyOf(s)] == true
-    Row(
-        Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
+    HandRow {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (r.cover != null) {
-                AsyncImage(r.cover, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            } else {
-                Icon(Icons.Filled.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-            Text("${s.artist} – ${s.title}", maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
-            val note = buildList {
-                when {
-                    s.inLibrary -> add("Kütüphanede")
-                    queued -> add("Sıraya alındı")
+            Box(
+                Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (r.cover != null) {
+                    AsyncImage(r.cover, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                } else {
+                    Icon(Icons.Filled.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (showStation) add(r.station + " · " + timeFormat.format(Date(r.time)))
-                else add(if (r.source == "shazam") "Sesten tanındı" else "Yayın bilgisinden")
-            }.joinToString(" · ")
-            Text(
-                note, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall,
-                color = if (s.inLibrary) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (!s.inLibrary) {
-            PreviewButton(s)
-            IconButton(enabled = !queued, onClick = { SongId.download(listOf(s)) }) {
-                Icon(
-                    if (queued) Icons.Filled.CloudDone else Icons.Filled.CloudDownload,
-                    contentDescription = if (queued) "Sıraya alındı" else Words.download,
+            }
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text("${s.artist} – ${s.title}", maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
+                val note = buildList {
+                    when {
+                        s.inLibrary -> add("Kütüphanede")
+                        queued -> add("Sıraya alındı")
+                    }
+                    if (showStation) add(r.station + " · " + timeFormat.format(Date(r.time)))
+                    else add(if (r.source == "shazam") "Sesten tanındı" else "Yayın bilgisinden")
+                }.joinToString(" · ")
+                Text(
+                    note, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall,
+                    color = if (s.inLibrary) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
-        if (onRemove != null) {
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Filled.Close, contentDescription = "Listeden kaldır", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!s.inLibrary) {
+                PreviewButton(s)
+                IconButton(enabled = !queued, onClick = { SongId.download(listOf(s)) }) {
+                    Icon(
+                        if (queued) Icons.Filled.CloudDone else Icons.Filled.CloudDownload,
+                        contentDescription = if (queued) "Sıraya alındı" else Words.download,
+                    )
+                }
+            }
+            if (onRemove != null) {
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Filled.Close, contentDescription = "Listeden kaldır", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }
 }
 
-/** Keşfet > Radyodan: radyoda duyulup tanınan şarkılar. */
+/** Keşfet > Duyduklarım: radyoda, telefonda ya da dışarıda duyulup tanınan şarkılar. */
 @Composable
 fun HeardTab() {
     LaunchedEffect(Unit) { SongId.load() }
