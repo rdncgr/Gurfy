@@ -33,6 +33,17 @@ android {
         }
     }
 
+    buildTypes {
+        getByName("release") {
+            // R8 küçültme: kullanılmayan kod ve kaynaklar atılır, APK ~20 MB'tan birkaç MB'a iner.
+            // İmza debug ile aynı; böylece eski (debug) kurulumun üzerine güncellenir.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
