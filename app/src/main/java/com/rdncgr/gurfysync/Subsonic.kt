@@ -43,7 +43,7 @@ class Subsonic(private val s: Settings, private val cacheDir: File) : Library {
     private val salt = "n0ta" + (System.currentTimeMillis() % 100000)
 
     fun url(endpoint: String, vararg params: Pair<String, String>): String {
-        val sb = StringBuilder(s.navidromeUrl).append("/rest/").append(endpoint)
+        val sb = StringBuilder(NetworkRoute.navidrome(s)).append("/rest/").append(endpoint)
         sb.append("?u=").append(enc(s.user))
         sb.append("&t=").append(md5(s.pass + salt)).append("&s=").append(salt)
         sb.append("&v=1.16.1&c=gurfysync&f=json")
@@ -194,7 +194,7 @@ class Subsonic(private val s: Settings, private val cacheDir: File) : Library {
 
     private fun nativeLogin(): String {
         val body = JSONObject().put("username", s.user).put("password", s.pass).toString().toRequestBody(jsonType)
-        http.newCall(Request.Builder().url(s.navidromeUrl + "/auth/login").post(body).build()).execute().use { resp ->
+        http.newCall(Request.Builder().url(NetworkRoute.navidrome(s) + "/auth/login").post(body).build()).execute().use { resp ->
             if (!resp.isSuccessful) throw IOException("Navidrome girişi başarısız: ${resp.code}")
             return JSONObject(resp.body?.string() ?: "{}").getString("token").also { ndToken = it }
         }
@@ -202,7 +202,7 @@ class Subsonic(private val s: Settings, private val cacheDir: File) : Library {
 
     private fun nativeGet(path: String, retry: Boolean = true): String {
         val token = ndToken ?: nativeLogin()
-        val req = Request.Builder().url(s.navidromeUrl + path).header("x-nd-authorization", "Bearer $token").build()
+        val req = Request.Builder().url(NetworkRoute.navidrome(s) + path).header("x-nd-authorization", "Bearer $token").build()
         http.newCall(req).execute().use { resp ->
             if (resp.code == 401 && retry) {
                 ndToken = null

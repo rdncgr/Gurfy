@@ -22,7 +22,7 @@ import com.rdncgr.gurfy.shared.Graph
 object SettingsBackup {
     /** Yedeklenen ayarlar (önbellek ve cihaza özel durumlar hariç). */
     val keys = setOf(
-        "navidromeUrl", "user", "pass", "serviceUrl", "serviceKey", "lastfmUser", "listenbrainzUser",
+        "navidromeUrl", "user", "pass", "serviceUrl", "serviceKey", "homeHost", "lastfmUser", "listenbrainzUser",
         "autoOffline", "autoOfflineCount", "wifiOnly", "offlineExcluded", "crossfadeSec", "playMode",
         "repeatMode", "radioShuffle", "radioPool", "lastRadio", "leftHand", "homeOrder", "homeHidden", "searchHistory", "heard", "skips",
     )

@@ -36,9 +36,9 @@ class ServiceApi(private val s: Settings) : MusicService {
         }
     }
 
-    private fun get(path: String) = exec(Request.Builder().url(s.serviceUrl + path))
+    private fun get(path: String) = exec(Request.Builder().url(NetworkRoute.service(s) + path))
     private fun post(path: String, body: JSONObject) =
-        exec(Request.Builder().url(s.serviceUrl + path).post(body.toString().toRequestBody(jsonType)))
+        exec(Request.Builder().url(NetworkRoute.service(s) + path).post(body.toString().toRequestBody(jsonType)))
 
     private fun suggestions(o: JSONObject): List<Suggestion> = o.list("tracks").map {
         Suggestion(
@@ -111,7 +111,7 @@ class ServiceApi(private val s: Settings) : MusicService {
 
     /** Önizleme sesinin adresi; servis sesi YouTube'dan alıp aktarır. */
     override fun previewUrl(t: Suggestion): String {
-        val sb = StringBuilder(s.serviceUrl).append("/preview?artist=").append(enc(t.artist))
+        val sb = StringBuilder(NetworkRoute.service(s)).append("/preview?artist=").append(enc(t.artist))
             .append("&title=").append(enc(t.title)).append("&key=").append(enc(s.serviceKey))
         t.url?.takeIf { it.isNotBlank() }?.let { sb.append("&url=").append(enc(it)) }
         return sb.toString()
@@ -136,7 +136,7 @@ class ServiceApi(private val s: Settings) : MusicService {
     /** Şarkı bulma topu: telefonda kaydedilen ses WAV olarak sunucuya gider, sunucu Shazam'a sorar. */
     override fun recognizeAudio(pcm: ShortArray, source: String): Recognition {
         val wav = Wav.encode(pcm, 16000)
-        val o = exec(Request.Builder().url(s.serviceUrl + "/recognize/audio").post(wav.toRequestBody("audio/wav".toMediaType())))
+        val o = exec(Request.Builder().url(NetworkRoute.service(s) + "/recognize/audio").post(wav.toRequestBody("audio/wav".toMediaType())))
         return recognition(o, source)
     }
 

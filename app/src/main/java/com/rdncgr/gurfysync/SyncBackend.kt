@@ -33,7 +33,10 @@ class SyncBackend(ctx: Context, private val settings: Settings) : Backend {
     override val accent: Color = Color(0xFFF2B84B)
     override val releaseTag = "gurfy-sync-v"
 
-    override fun start(ctx: Context) = SettingsBackup.start(settings.prefs)
+    override fun start(ctx: Context) {
+        NetworkRoute.start(ctx)
+        SettingsBackup.start(settings.prefs)
+    }
 
     @Composable
     override fun ConnectionSettings() = SyncConnectionSettings()
@@ -44,6 +47,10 @@ class SyncBackend(ctx: Context, private val settings: Settings) : Backend {
 /** Navidrome, Gurfy servisi, Last.fm ve servis içi bağlantıları tek seferde sınar. */
 internal fun checkAll(): List<Status> {
     val out = mutableListOf<Status>()
+    if (NetworkRoute.homeHost.isNotBlank()) {
+        val home = NetworkRoute.probeNow()
+        out += Status("Adres", true, if (home) "Evdesin: ${NetworkRoute.homeHost} kullanılıyor" else NetworkRoute.describe())
+    }
     try {
         Graph.subsonic.ping()
         out += Status("Navidrome", true, "Telefondan bağlanılıyor")
@@ -129,6 +136,7 @@ internal fun SyncConnectionSettings() {
     var user by remember(SettingsBackup.restored) { mutableStateOf(s.user) }
     var pass by remember(SettingsBackup.restored) { mutableStateOf(s.pass) }
     var serviceUrl by remember(SettingsBackup.restored) { mutableStateOf(s.serviceUrl) }
+    var homeHost by remember(SettingsBackup.restored) { mutableStateOf(NetworkRoute.homeHost) }
     var serviceKey by remember(SettingsBackup.restored) { mutableStateOf(s.serviceKey) }
     var lastfmUser by remember(SettingsBackup.restored) { mutableStateOf(s.lastfmUser) }
     var lbUser by remember(SettingsBackup.restored) { mutableStateOf(s.listenbrainzUser) }
@@ -141,6 +149,7 @@ internal fun SyncConnectionSettings() {
         s.user = user
         s.pass = pass
         s.serviceUrl = serviceUrl
+        NetworkRoute.homeHost = homeHost
         s.serviceKey = serviceKey
         s.lastfmUser = lastfmUser
         s.listenbrainzUser = lbUser
@@ -163,7 +172,8 @@ internal fun SyncConnectionSettings() {
         SettingsCard {
         InfoTitle(
             "Navidrome",
-            "Müzik arşivinin sunucusu. Ev dışından dinlemek için sunucunun VPN adresini yaz (ZeroTier, Tailscale…).",
+            "Müzik arşivinin sunucusu. Ev dışından dinlemek için sunucunun VPN adresini yaz (ZeroTier, Tailscale…). " +
+                "Evdeyken yerel adres kullanılsın istersen aşağıdaki \"Ev ağı\" kartını doldur.",
         )
         OutlinedTextField(
             navidromeUrl, { navidromeUrl = it }, singleLine = true, modifier = field,
@@ -190,6 +200,27 @@ internal fun SyncConnectionSettings() {
             serviceKey, { serviceKey = it }, singleLine = true, modifier = field, label = { Text("Servis parolası") },
             visualTransformation = PasswordVisualTransformation(),
         )
+        }
+
+        SettingsCard {
+        InfoTitle(
+            "Ev ağı (isteğe bağlı)",
+            "Sunucunun evdeki yerel adresi. Ağ her değiştiğinde uygulama bu adrese ulaşmayı dener: ulaşırsa Navidrome " +
+                "ve Gurfy servisi bu adresten (aynı portlarla), ulaşamazsa yukarıdaki adreslerden kullanılır. " +
+                "Wi-Fi adına bakılmaz; konum izni gerekmez.",
+        )
+        OutlinedTextField(
+            homeHost, { homeHost = it }, singleLine = true, modifier = field,
+            label = { Text("Ev ağındaki adres") }, placeholder = { Text("ör. 192.168.1.101") },
+        )
+        if (NetworkRoute.homeHost.isNotBlank() && NetworkRoute.checked) {
+            Text(
+                if (NetworkRoute.atHome) "Şu an evdesin: ${NetworkRoute.homeHost} kullanılıyor."
+                else "Şu an dışarıdasın: yukarıdaki adresler kullanılıyor.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
         }
 
         SettingsCard {

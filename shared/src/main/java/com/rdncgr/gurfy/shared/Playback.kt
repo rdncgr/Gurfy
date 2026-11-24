@@ -401,6 +401,17 @@ class PlayerController(private val ctx: Context) {
                     override fun onPlayerError(error: PlaybackException) {
                         val q = queue
                         val from = c.currentMediaItemIndex
+                        // Ağ değişmiş olabilir (Wi-Fi ⇄ hücresel): şarkıyı bir kez güncel adresle yeniden dene
+                        val cur = q.getOrNull(from)
+                        if (cur != null && !cur.isRadio && !cur.isLocal && retriedId != cur.id && q.size == c.mediaItemCount) {
+                            retriedId = cur.id
+                            val pos = c.currentPosition
+                            c.replaceMediaItem(from, toItem(cur))
+                            c.seekTo(from, pos)
+                            c.prepare()
+                            c.play()
+                            return
+                        }
                         val nextLocal = ((from + 1 until q.size) + (0 until from))
                             .firstOrNull { Graph.offline.downloaded.containsKey(q[it].id) }
                         if (nextLocal != null) {
@@ -414,6 +425,7 @@ class PlayerController(private val ctx: Context) {
                     }
 
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                        retriedId = null
                         maybeExtend(c)
                         Scrobbler.reset() // aynı şarkı tekrarlansa da yeni bir dinleme sayılır
                     }
@@ -431,6 +443,20 @@ class PlayerController(private val ctx: Context) {
                 Graph.toast("Çalar başlatılamadı")
             }
         }, ContextCompat.getMainExecutor(ctx))
+    }
+
+    private var retriedId: String? = null
+
+    /**
+     * Ağ değişince (Gurfy Sync: Wi-Fi ⇄ hücresel adres) çalma sırasındaki sonraki şarkıların adresini yeniler.
+     * Çalan şarkı kesilmez; bağlantısı koparsa onPlayerError güncel adresle yeniden dener.
+     */
+    fun refreshUrls() {
+        val c = controller ?: return
+        val q = queue
+        if (current?.isRadio == true || q.size != c.mediaItemCount) return
+        val i = c.currentMediaItemIndex
+        if (i + 1 < c.mediaItemCount) c.replaceMediaItems(i + 1, c.mediaItemCount, q.drop(i + 1).map(::toItem))
     }
 
     private fun withController(block: (MediaController) -> Unit) {
